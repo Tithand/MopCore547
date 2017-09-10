@@ -1463,6 +1463,7 @@ void AchievementMgr<T>::UpdateAchievementCriteria(AchievementCriteriaTypes type,
             case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_GUILD_CHALLENGE_TYPE:
             case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_GUILD_CHALLENGE:
             case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_QUEST:
+            case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_SCENARIO:
                 SetCriteriaProgress(achievementCriteria, 1, referencePlayer, PROGRESS_ACCUMULATE);
                 break;
             // std case: increment at miscValue1
@@ -1914,6 +1915,9 @@ bool AchievementMgr<T>::IsCompletedCriteria(AchievementCriteriaEntry const* achi
             return progress->counter >= achievementCriteria->guild_challenge_complete_type.count;
         case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_GUILD_CHALLENGE:
             return progress->counter >= achievementCriteria->guild_challenge_complete.count;
+        case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_SCENARIO:
+            return progress->counter >= value.scenario_complete.count;
+
         // handle all statistic-only criteria here
         case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_BATTLEGROUND:
         case ACHIEVEMENT_CRITERIA_TYPE_DEATH_AT_MAP:
@@ -3203,6 +3207,10 @@ bool AchievementMgr<T>::RequirementsSatisfied(AchievementCriteriaEntry const *ac
             if (miscValue1 != achievementCriteria->guild_challenge_complete_type.challenge_type)
                 return false;
             break;
+        case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_SCENARIO:
+            if (p_MiscValue1 != value.scenario_complete.scenarioType)
+                return false;
+            break;
         default:
             break;
     }
@@ -3971,6 +3979,8 @@ char const* AchievementGlobalMgr::GetCriteriaTypeString(AchievementCriteriaTypes
             return "GUILD_CHALLENGE_TYPE";
         case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_GUILD_CHALLENGE:
             return "GUILD_CHALLENGE";
+        case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_SCENARIO:
+            return "COMPLETE_SCENARIO";
     }
     return "MISSING_TYPE";
 }

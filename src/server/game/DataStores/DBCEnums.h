@@ -307,8 +307,9 @@ enum AchievementCriteriaTypes
     ACHIEVEMENT_CRITERIA_TYPE_UNK148                        = 148, // achievement 6267 other fields = 0
     ACHIEVEMENT_CRITERIA_TYPE_UNK149                        = 149, // achievement 6267 other fields = 0
     ACHIEVEMENT_CRITERIA_TYPE_UNK150                        = 150, // achievement 6271 other fields = 0
-    // 0..150 => 151 criteria types total
-    ACHIEVEMENT_CRITERIA_TYPE_TOTAL                         = 151
+    ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_SCENARIO             = 152,
+    // 0..162 => 163 criteria types total
+    ACHIEVEMENT_CRITERIA_TYPE_TOTAL                         = 163
 };
 
 enum AreaFlags

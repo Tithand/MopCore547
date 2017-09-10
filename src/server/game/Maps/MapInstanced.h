@@ -45,6 +45,16 @@ class MapInstanced : public Map
             InstancedMaps::const_iterator i = m_InstancedMaps.find(instanceId);
             return(i == m_InstancedMaps.end() ? NULL : i->second);
         }
+        Map* FindScenarioMap(uint64 owner)
+        {
+            for (InstancedMaps::const_iterator itr = m_InstancedMaps.begin(); itr != m_InstancedMaps.end(); ++itr)
+            {
+                if (itr->second->GetScenarioOwner() == owner)
+                    return itr->second;
+            }
+
+            return NULL;
+        }
         bool DestroyInstance(InstancedMaps::iterator &itr);
 
         void AddGridMapReference(const GridCoord &p)
@@ -66,6 +76,7 @@ class MapInstanced : public Map
     private:
         InstanceMap* CreateInstance(uint32 InstanceId, InstanceSave* save, Difficulty difficulty);
         BattlegroundMap* CreateBattleground(uint32 InstanceId, Battleground* bg);
+        InstanceMap* CreateScenarioInstance(uint32 InstanceId, uint64 ownerId, Difficulty difficulty);
 
         InstancedMaps m_InstancedMaps;
 

@@ -48,7 +48,8 @@ enum LfgFlags
     LFG_FLAG_UNK1                                = 0x1,
     LFG_FLAG_UNK2                                = 0x2,
     LFG_FLAG_SEASONAL                            = 0x4,
-    LFG_FLAG_UNK3                                = 0x8
+    LFG_FLAG_UNK3                                = 0x8,
+    LFG_FLAG_SINGLE                              = 0x400, // Single scenarios have this flag
 };
 
 /// Determines the type of instance
@@ -363,6 +364,7 @@ class LFGMgr
         void SetCompatibles(std::string concatenatedGuids, bool compatibles);
         LfgAnswer GetCompatibles(std::string concatenatedGuids);
         void RemoveFromCompatibles(uint64 guid);
+        LfgProposal* CheckForSingle(LfgGuidList& check);
 
         // Generic
         const LfgDungeonSet& GetDungeonsByRandom(uint32 randomdungeon, bool check = false);

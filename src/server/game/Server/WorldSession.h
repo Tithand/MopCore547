@@ -1087,6 +1087,9 @@ class WorldSession
         void HandleBlackMarketBid(WorldPacket& recvData);
         void SendBlackMarketBidResult(uint32 itemEntry, uint32 auctionId);
 
+        // Scenario
+        void Handle_Scenario(WorldPacket& recvData);
+
     private:
         void InitializeQueryCallbackParameters();
         void ProcessQueryCallbacks();

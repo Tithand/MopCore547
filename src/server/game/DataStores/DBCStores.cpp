@@ -185,6 +185,9 @@ std::set<ResearchProjectEntry const*> sResearchProjectSet;
 DBCStorage <ScalingStatDistributionEntry> sScalingStatDistributionStore(ScalingStatDistributionfmt);
 DBCStorage <ScalingStatValuesEntry>      sScalingStatValuesStore(ScalingStatValuesfmt);
 
+DBCStorage <ScenarioEntry>               sScenarioStore(ScenarioEntryfmt);
+DBCStorage <ScenarioStepEntry>           sScenarioStepStore(ScenarioStepEntryfmt);
+
 DBCStorage <SkillLineEntry>              sSkillLineStore(SkillLinefmt);
 DBCStorage <SkillLineAbilityEntry>       sSkillLineAbilityStore(SkillLineAbilityfmt);
 
@@ -467,6 +470,35 @@ void LoadDBCStores(const std::string& dataPath)
     LoadDBC(availableDbcLocales, bad_dbc_files, sItemDisenchantLootStore,     dbcPath, "ItemDisenchantLoot.dbc");
 
     LoadDBC(availableDbcLocales, bad_dbc_files, sLFGDungeonStore,             dbcPath, "LFGDungeons.dbc");                                                  // 17399
+    for (uint32 i = 0; i < sLFGDungeonStore.GetNumRows(); ++i)
+    {
+        if (LFGDungeonEntry* entry = sLFGDungeonStore.LookupEntry(i))
+        {
+            if (entry->isScenario())
+            {
+                switch (entry->map)
+                {
+                    case 1000:  // theramore's fall alliance
+                    case 999:   // theramore's fall horde
+                    case 1130:  // Blood on the Snow
+                    case 1050:  // Assault on Zan'vess
+                        entry->type = 4; // hack
+                        break;
+                }
+            }
+
+            if (entry->isScenarioSingle())
+            {
+                // fix access to some scenarios
+                if (entry->maxlevel == 0)
+                    entry->maxlevel = 90;
+
+                // fix when single scenarios are included in random
+                entry->grouptype = 0;
+            }
+        }
+    }
+
     LoadDBC(availableDbcLocales, bad_dbc_files, sLiquidTypeStore,             dbcPath, "LiquidType.dbc");                                                   // 17399
     LoadDBC(availableDbcLocales, bad_dbc_files, sLockStore,                   dbcPath, "Lock.dbc");                                                         // 17399
     LoadDBC(availableDbcLocales, bad_dbc_files, sPhaseStores,                 dbcPath, "Phase.dbc");                                                        // 17399
@@ -480,6 +512,28 @@ void LoadDBCStores(const std::string& dataPath)
     for (uint32 i = 0; i < sMapDifficultyStore.GetNumRows(); ++i)
         if (MapDifficultyEntry const* entry = sMapDifficultyStore.LookupEntry(i))
             sMapDifficultyMap[MAKE_PAIR32(entry->MapId, entry->Difficulty)] = MapDifficulty(entry->resetTime, entry->maxPlayers, entry->areaTriggerText[0] > 0);
+
+    // There are no scenarios in MapDifficulty.dbc
+    // Need to add it
+    for (uint32 i = 0; i < sLFGDungeonStore.GetNumRows(); ++i)
+    {
+        LFGDungeonEntry const* lfdEntry = sLFGDungeonStore.LookupEntry(i);
+        if (lfdEntry == NULL)
+            continue;
+
+        if (lfdEntry->difficulty != SCENARIO_DIFFICULTY_NORMAL && lfdEntry->difficulty != SCENARIO_DIFFICULTY_HEROIC)
+            continue;
+
+        uint32 pair = MAKE_PAIR32(lfdEntry->map, lfdEntry->difficulty);
+
+        if (sMapDifficultyMap.find(pair) != sMapDifficultyMap.end())
+            continue;
+
+        uint32 maxPlayers = lfdEntry->dpsNeeded + lfdEntry->tankNeeded + lfdEntry->healerNeeded;
+
+        sMapDifficultyMap[pair] = MapDifficulty(0, maxPlayers, false);
+    }
+
     sMapDifficultyStore.Clear();
 
     LoadDBC(availableDbcLocales, bad_dbc_files, sMountCapabilityStore,        dbcPath, "MountCapability.dbc");                                              // 17399
@@ -545,6 +599,8 @@ void LoadDBCStores(const std::string& dataPath)
     //sResearchSiteStore.Clear();
 
     LoadDBC(availableDbcLocales, bad_dbc_files, sScalingStatDistributionStore,dbcPath, "ScalingStatDistribution.dbc");                                      // 17399
+    LoadDBC(availableDbcLocales, bad_dbc_files, sScenarioStore,               dbcPath, "Scenario.dbc");
+    LoadDBC(availableDbcLocales, bad_dbc_files, sScenarioStepStore,           dbcPath, "ScenarioStep.dbc");
     LoadDBC(availableDbcLocales, bad_dbc_files, sScalingStatValuesStore,      dbcPath, "ScalingStatValues.dbc");                                            // 17399
     LoadDBC(availableDbcLocales, bad_dbc_files, sSkillLineStore,              dbcPath, "SkillLine.dbc");                                                    // 17399
     LoadDBC(availableDbcLocales, bad_dbc_files, sSkillLineAbilityStore,       dbcPath, "SkillLineAbility.dbc");                                             // 17399

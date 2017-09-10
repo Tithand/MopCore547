@@ -24,6 +24,7 @@
 #include "InstanceSaveMgr.h"
 #include "World.h"
 #include "Group.h"
+#include "LFGMgr.h"
 
 MapInstanced::MapInstanced(uint32 id, time_t expiry) : Map(id, expiry, 0, DUNGEON_DIFFICULTY_NORMAL)
 {
@@ -136,6 +137,31 @@ Map* MapInstanced::CreateInstanceForPlayer(const uint32 mapId, Player* player)
                 player->TeleportToBGEntryPoint();
                 return NULL;
             }
+        }
+    }
+    else if (IsScenario())
+    {
+        Difficulty difficulty = SCENARIO_DIFFICULTY_NORMAL;
+
+        uint64 ownerGuid = player->GetGroup() ? player->GetGroup()->GetLeaderGUID() : player->GetGUID();
+
+        uint64 groupGuid = player->GetGroup() ? player->GetGroup()->GetGUID() : 0;
+        if (groupGuid)
+        {
+            uint32 dungeonId = sLFGMgr->GetDungeon(groupGuid);
+            LFGDungeonEntry const* lfgEntry = sLFGDungeonStore.LookupEntry(dungeonId);
+            if (lfgEntry)
+            {
+                difficulty = (Difficulty)lfgEntry->difficulty;
+            }
+        }
+
+
+        map = FindScenarioMap(ownerGuid);
+        if (!map)
+        {
+            newInstanceId = sMapMgr->GenerateInstanceId();
+            map = CreateScenarioInstance(newInstanceId, ownerGuid, difficulty);
         }
     }
     else
@@ -309,4 +335,34 @@ bool MapInstanced::CanEnter(Player* /*player*/)
 {
     //ASSERT(false);
     return true;
+}
+
+InstanceMap* MapInstanced::CreateScenarioInstance(uint32 InstanceId, uint64 owner, Difficulty difficulty)
+{
+    // load/create a map
+    TRINITY_GUARD(ACE_Thread_Mutex, Lock);
+
+    // make sure we have a valid map id
+    const MapEntry* entry = sMapStore.LookupEntry(GetId());
+    if (!entry)
+    {
+        sLog->outError(LOG_FILTER_MAPS, "CreateInstance: no entry for map %d", GetId());
+        ASSERT(false);
+    }
+    const InstanceTemplate* iTemplate = sObjectMgr->GetInstanceTemplate(GetId());
+    if (!iTemplate)
+    {
+        sLog->outError(LOG_FILTER_MAPS, "CreateInstance: no instance template for map %d", GetId());
+        ASSERT(false);
+    }
+
+    InstanceMap* map = new InstanceMap(GetId(), GetGridExpiry(), InstanceId, difficulty, this);
+    ASSERT(map->IsScenario());
+
+    map->SetScenarioOwner(owner);
+
+    map->CreateInstanceData(false);
+
+    m_InstancedMaps[InstanceId] = map;
+    return map;
 }

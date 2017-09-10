@@ -610,6 +610,13 @@ struct AchievementCriteriaEntry
             uint32  dungeonsComplete;
         } use_lfg;
 
+        // ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_SCENARIO = 152
+        struct
+        {
+            uint32 scenarioType;
+            uint32 count;
+        } scenario_complete;
+
         struct
         {
             uint32  field3;                                 // 3 main requirement
@@ -1584,7 +1591,7 @@ struct LFGDungeonEntry
     uint32  difficulty;                                     // 8
     uint32  flags;                                          // 9
     uint32  type;                                           // 10
-    //int32  unk_1;                                         // 11
+    int32  faction;                                         // 11
     //char*   namelite;                                     // 12 Name lite
     uint32  expansion;                                      // 13
     //uint32  unk_2;                                        // 14
@@ -1605,7 +1612,8 @@ struct LFGDungeonEntry
     // Helpers
     uint32 Entry() const { return ID + (type << 24); }
     // 1 = LFG_TYPE_DUNGEON
-    bool isScenario() const { return type == 1 && tankNeeded == 0 && healerNeeded == 0 && (dpsNeeded == 3 || dpsNeeded == 1); }
+    bool isScenario() const { return type == 1 && tankNeeded == 0 && healerNeeded == 0 && dpsNeeded == 3; }
+    bool isScenarioSingle() const { return type == 1 && tankNeeded == 0 && healerNeeded == 0 && dpsNeeded == 1; }
 };
 
 
@@ -1898,6 +1906,24 @@ struct ScalingStatValuesEntry
     uint32 GetStatMultiplier(uint32 inventoryType) const;
     uint32 GetArmor(uint32 inventoryType, uint32 armorType) const;
     uint32 GetDPSAndDamageMultiplier(uint32 subClass, bool isCasterWeapon, float* damageMultiplier) const;
+};
+
+struct ScenarioEntry
+{
+    uint32 ID;
+    char*  NameLang;
+    uint32 Flags;
+};
+
+struct ScenarioStepEntry
+{
+    uint32 ID;
+    uint32 CriteriaTreeID;
+    uint32 ScenarioID;
+    uint32 OrderIndex;
+    char*  DescriptionLang;
+    char*  TitleLang;
+    uint32 Flags;
 };
 
 // @author Selenium: 5.4 valid

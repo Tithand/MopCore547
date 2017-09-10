@@ -378,7 +378,7 @@ class Map : public GridRefManager<NGridType>
         bool Is25ManRaid() const { return IsRaid() && (i_spawnMode == RAID_DIFFICULTY_25MAN_NORMAL || i_spawnMode == RAID_DIFFICULTY_25MAN_HEROIC || 
             i_spawnMode == RAID_DIFFICULTY_25MAN_LFR); }   // Raids 25 man Normal, Heroic and LFR.
         bool Is40ManRaid() const { return IsRaid() && i_spawnMode == RAID_DIFFICULTY_40MAN; } // 40 man Raid.
-        bool IsScenario() const { return i_mapEntry && i_mapEntry->IsScenario(); } // For future usage.
+        bool IsScenario() const { return i_mapEntry && i_mapEntry->IsScenario(); }
 
         bool IsBattleground() const { return i_mapEntry && i_mapEntry->IsBattleground(); }
         bool IsBattleArena() const { return i_mapEntry && i_mapEntry->IsBattleArena(); }
@@ -489,6 +489,9 @@ class Map : public GridRefManager<NGridType>
         void DeleteRespawnTimes();
 
         static void DeleteRespawnTimesInDB(uint16 mapId, uint32 instanceId);
+
+        uint64 GetScenarioOwner() { return m_ScenarioOwner; }
+        void SetScenarioOwner(uint64 owner) { m_ScenarioOwner = owner; }
 
     private:
         void LoadMapAndVMap(int gx, int gy);
@@ -617,6 +620,8 @@ class Map : public GridRefManager<NGridType>
 
         UNORDERED_MAP<uint32 /*dbGUID*/, time_t> _creatureRespawnTimes;
         UNORDERED_MAP<uint32 /*dbGUID*/, time_t> _goRespawnTimes;
+
+        uint64 m_ScenarioOwner;
 };
 
 enum InstanceResetMethod

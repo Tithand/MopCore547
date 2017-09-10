@@ -19567,6 +19567,10 @@ bool Player::LoadFromDB(uint32 guid, SQLQueryHolder *holder, PreparedQueryResult
         sLog->outError(LOG_FILTER_PLAYER, "Player (guidlow %d) have invalid coordinates (MapId: %u X: %f Y: %f Z: %f O: %f). Teleport to default race/class locations.", guid, mapId, GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation());
         RelocateToHomebind();
     }
+    else if (mapEntry && mapEntry->IsScenario())
+    {
+        RelocateToHomebind();
+    }
     // Player was saved in Arena or Bg
     else if (mapEntry && mapEntry->IsBattlegroundOrArena())
     {

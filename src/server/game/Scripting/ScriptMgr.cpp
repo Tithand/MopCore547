@@ -1479,7 +1479,7 @@ WorldMapScript::WorldMapScript(const char* name, uint32 mapId)
 InstanceMapScript::InstanceMapScript(const char* name, uint32 mapId)
     : ScriptObject(name), MapScript<InstanceMap>(mapId)
 {
-    if (GetEntry() && !GetEntry()->IsDungeon())
+    if (GetEntry() && !GetEntry()->IsDungeon() && !GetEntry()->IsScenario())
         sLog->outError(LOG_FILTER_TSCR, "InstanceMapScript for map %u is invalid.", mapId);
 
     ScriptRegistry<InstanceMapScript>::AddScript(this);

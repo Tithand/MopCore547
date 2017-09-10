@@ -228,6 +228,16 @@ void WorldSession::HandleLfgLockInfoRequestOpcode(WorldPacket& recvData)
             else if (dungeon->type != TYPEID_RANDOM_DUNGEON)
                 continue;
 
+            // Some scenarios are alliance or horde only
+            if (dungeon->faction != -1)
+            {
+                if (dungeon->faction == 1 && GetPlayer()->GetTeamId() != TEAM_ALLIANCE)
+                    continue;
+
+                if (dungeon->faction == 0 && GetPlayer()->GetTeamId() != TEAM_HORDE)
+                    continue;
+            }
+
             randomDungeons.insert(dungeon->Entry());
         }
     }

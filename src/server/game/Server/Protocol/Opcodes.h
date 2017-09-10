@@ -450,7 +450,7 @@ enum Opcodes
     CMSG_ROLE_POLL_BEGIN                              = 0x0D90, // 5.4.7 18019
     CMSG_SAVE_CUF_PROFILES                            = 0x0C88, // 5.4.7 18019
     CMSG_SAVE_GUILD_EMBLEM                            = 0x0C81, // 5.4.7 18019
-	CMSG_SCENARIO_QUERY                               = 0x1033, // 5.4.7 18019 NYI
+	CMSG_SCENARIO_QUERY                               = 0x1033, // 5.4.7 18019
     CMSG_SELECT_FACTION                               = 0x1C7A, // 5.4.7 18019
     CMSG_SELF_RES                                     = 0x10F4, // 5.4.7 18019
     CMSG_SELL_ITEM                                    = 0x115F, // 5.4.7 18019

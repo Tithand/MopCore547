@@ -616,6 +616,24 @@ void LFGMgr::InitializeLockedDungeons(Player* player)
             locktype = LFG_LOCKSTATUS_ATTUNEMENT_TOO_LOW_LEVEL;
             locktype = LFG_LOCKSTATUS_ATTUNEMENT_TOO_HIGH_LEVEL;
         */
+        // Some scenarios are alliance or horde only
+        // Cannot skip scenario lock data
+        // Because client always shows them
+        if (dungeon->faction != -1)
+        {
+            if (dungeon->faction == 1 && player->GetTeamId() != TEAM_ALLIANCE)
+            {
+                lockData.itemLevel = 999;
+                lockData.lockstatus = LFG_LOCKSTATUS_TOO_LOW_GEAR_SCORE;
+            }
+
+            if (dungeon->faction == 0 && player->GetTeamId() != TEAM_HORDE)
+            {
+                lockData.itemLevel = 999;
+                lockData.lockstatus = LFG_LOCKSTATUS_TOO_LOW_GEAR_SCORE;
+            }
+        }
+
         if (dungeon->type != TYPEID_RANDOM_DUNGEON)
         {
             if (dungeon->map > 0)
@@ -763,6 +781,9 @@ void LFGMgr::Join(Player* player, uint8 roles, const LfgDungeonSet& selectedDung
                     if (isDungeon)
                         joinData.result = LFG_JOIN_MIXED_RAID_DUNGEON;
                     isRaid = true;
+                    break;
+                case LFG_SUBTYPEID_SCENARIO:
+                    isDungeon = true;
                     break;
                 default:
                     joinData.result = LFG_JOIN_DUNGEON_INVALID;
@@ -1195,26 +1216,26 @@ bool LFGMgr::CheckCompatibility(LfgGuidList check, LfgProposal*& pProposal, LfgT
 
         switch (type)
         {
-        case LFG_SUBTYPEID_DUNGEON:
-            Dps_Needed = 3;
-            Healers_Needed = 1;
-            Tanks_Needed = 1;
-            break;
-        case LFG_SUBTYPEID_RAID:
-            Dps_Needed = 17;
-            Healers_Needed = 6;
-            Tanks_Needed = 2;
-            break;
-        case LFG_SUBTYPEID_SCENARIO:
-            Dps_Needed = 3;
-            Healers_Needed = 0;
-            Tanks_Needed = 0;
-            break;
-        default:
-            Dps_Needed = 3;
-            Healers_Needed = 1;
-            Tanks_Needed = 1;
-            break;
+            case LFG_SUBTYPEID_DUNGEON:
+                Dps_Needed = 3;
+                Healers_Needed = 1;
+                Tanks_Needed = 1;
+                break;
+            case LFG_SUBTYPEID_RAID:
+                Dps_Needed = 17;
+                Healers_Needed = 6;
+                Tanks_Needed = 2;
+                break;
+            case LFG_SUBTYPEID_SCENARIO:
+                Dps_Needed = 3;
+                Healers_Needed = 0;
+                Tanks_Needed = 0;
+                break;
+            default:
+                Dps_Needed = 3;
+                Healers_Needed = 1;
+                Tanks_Needed = 1;
+                break;
         }
         for (LfgQueueInfoMap::const_iterator itQueue = pqInfoMap.begin(); itQueue != pqInfoMap.end(); ++itQueue)
         {
@@ -1545,26 +1566,26 @@ bool LFGMgr::CheckGroupRoles(LfgRolesMap& groles, LfgType type, bool removeLeade
 
     switch (type)
     {
-    case TYPEID_DUNGEON:
-        dpsNeeded = 3;
-        healerNeeded = 1;
-        tankNeeded = 1;
-        break;
-    case LFG_SUBTYPEID_RAID:
-        dpsNeeded = 17;
-        healerNeeded = 6;
-        tankNeeded = 2;
-        break;
-    case LFG_SUBTYPEID_SCENARIO:
-        dpsNeeded = 3;
-        healerNeeded = 0;
-        tankNeeded = 0;
-        break;
-    default:
-        dpsNeeded = 3;
-        healerNeeded = 1;
-        tankNeeded = 1;
-        break;
+        case TYPEID_DUNGEON:
+            dpsNeeded = 3;
+            healerNeeded = 1;
+            tankNeeded = 1;
+            break;
+        case LFG_SUBTYPEID_RAID:
+            dpsNeeded = 17;
+            healerNeeded = 6;
+            tankNeeded = 2;
+            break;
+        case LFG_SUBTYPEID_SCENARIO:
+            dpsNeeded = 3;
+            healerNeeded = 0;
+            tankNeeded = 0;
+            break;
+        default:
+            dpsNeeded = 3;
+            healerNeeded = 1;
+            tankNeeded = 1;
+            break;
     }
 
     if (removeLeaderFlag)
@@ -2624,4 +2645,46 @@ LfgUpdateData LFGMgr::GetLfgStatus(uint64 guid)
 {
     LfgPlayerData& playerData = m_Players[guid];
     return LfgUpdateData(LFG_UPDATETYPE_UPDATE_STATUS,  playerData.GetSelectedDungeons(), playerData.GetComment());
+}
+
+LfgProposal* LFGMgr::CheckForSingle(LfgGuidList& check)
+{
+    for (uint64 &guid : check)
+    {
+        uint64 playerGuid = guid;
+
+        LfgQueueInfoMap::const_iterator itr = m_QueueInfoMap.find(playerGuid);
+        if (itr == m_QueueInfoMap.end())
+            continue;
+
+        if (itr->second->dungeons.size() != 1)
+            continue;
+
+        uint32 dungeonId  = (*(itr->second->dungeons.begin()));
+        LFGDungeonEntry const* dungeonEntry = sLFGDungeonStore.LookupEntry(dungeonId);
+        if (!dungeonEntry)
+            continue;
+
+        if (!dungeonEntry->isScenarioSingle())
+            continue;
+
+        LfgGuidList groupGuids;
+        groupGuids.push_back(playerGuid);
+
+        LfgProposalPlayer* ppPlayer = new LfgProposalPlayer();
+        
+        ppPlayer->role = ROLE_DAMAGE;
+
+        LfgProposal* pProposal = new LfgProposal(dungeonId);
+        pProposal->cancelTime = time_t(time(NULL)) + LFG_TIME_PROPOSAL;
+        pProposal->state = LFG_PROPOSAL_INITIATING;
+        pProposal->queues = groupGuids;
+        pProposal->groupLowGuid = 0;
+        pProposal->leader = playerGuid;
+        pProposal->players[playerGuid] = ppPlayer;
+
+        return pProposal;
+    }
+
+    return nullptr;
 }

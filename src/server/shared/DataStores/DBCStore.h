@@ -77,7 +77,7 @@ class DBCStorage
         }
         ~DBCStorage() { Clear(); }
 
-        T const* LookupEntry(uint32 id) const
+        T* LookupEntry(uint32 id)
         {
             return (id >= nCount) ? NULL : indexTable.asT[id];
         }

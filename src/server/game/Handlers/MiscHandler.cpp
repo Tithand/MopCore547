@@ -3076,3 +3076,23 @@ void WorldSession::HandleChangePlayerDifficulty(WorldPacket& recvData)
         }
     }
 }
+
+void WorldSession::Handle_Scenario(WorldPacket& recvData)
+{
+    uint32 count = recvData.ReadBits(22);
+
+    if (count > 0)
+    {
+        std::list<uint32> criteriaTrees;
+        for (uint32 i = 0; i < count; ++i)
+        {
+            uint32 criteriaTree;
+
+            recvData >> criteriaTree;
+
+            criteriaTrees.push_back(criteriaTree);
+        }
+
+        //sScenarioManagerMgr->SendScenarioPOI(criteriaTrees, GetPlayer());
+    }
+}

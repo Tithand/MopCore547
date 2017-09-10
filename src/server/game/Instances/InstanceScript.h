@@ -131,10 +131,28 @@ struct MinionInfo
 typedef std::multimap<uint32 /*entry*/, DoorInfo> DoorInfoMap;
 typedef std::map<uint32 /*entry*/, MinionInfo> MinionInfoMap;
 
+struct BossScenarios
+{
+    BossScenarios()
+    {
+        m_BossID = 0;
+        m_ScenarioID = 0;
+    }
+
+    BossScenarios(uint32 p_ID, uint32 p_Scenario)
+    {
+        m_BossID = p_ID;
+        m_ScenarioID = p_Scenario;
+    }
+
+    uint32 m_BossID;
+    uint32 m_ScenarioID;
+};
+
 class InstanceScript : public ZoneScript
 {
     public:
-        explicit InstanceScript(Map* map) : instance(map), completedEncounters(0) {}
+        explicit InstanceScript(Map* map);
 
         virtual ~InstanceScript() {}
 
@@ -245,12 +263,113 @@ class InstanceScript : public ZoneScript
 
         virtual void FillInitialWorldStates(ByteBuffer& /*data*/) { }
 
+        struct CriteriaProgressData
+        {
+            CriteriaProgressData(uint32 p_ID, uint64 p_Quantity, uint64 p_Guid, uint32 p_Date, uint32 p_StartTime, uint8 p_Flags)
+            {
+                m_ID = p_ID;
+                m_Quantity = p_Quantity;
+                m_Guid = p_Guid;
+                m_Date = p_Date;
+                m_TimeFromStart = p_StartTime;
+                m_TimeFromCreate = p_StartTime;
+                m_Flags = p_Flags;
+            }
+
+            CriteriaProgressData()
+            {
+                m_ID = 0;
+                m_Quantity = 0;
+                m_Guid = 0;
+                m_Date = 0;
+                m_TimeFromStart = 0;
+                m_TimeFromCreate = 0;
+                m_Flags = 0;
+            }
+
+            uint32 m_ID;
+            uint64 m_Quantity;
+            uint64 m_Guid;
+            uint32 m_Date;
+            uint32 m_TimeFromStart;
+            uint32 m_TimeFromCreate;
+            uint8  m_Flags;
+        };
+
+        struct ScenarioData
+        {
+            ScenarioData(uint32 p_ScenarioID, uint32 p_StepID, uint32 p_CurrWave, uint32 p_MaxWave, uint32 p_Timer, uint32 p_CriteriaCount,
+                bool p_Complete)
+            {
+                m_ScenarioID = p_ScenarioID;
+                m_StepID = p_StepID;
+                m_WaveCurrent = p_CurrWave;
+                m_WaveMax = p_MaxWave;
+                m_TimerDuration = p_Timer;
+                m_CriteriaCount = p_CriteriaCount;
+                m_ScenarioComplete = p_Complete;
+
+                m_CriteriaProgress.resize(m_CriteriaCount);
+            }
+
+            ScenarioData(uint32 p_ScenarioID, uint32 p_StepID)
+            {
+                m_ScenarioID = p_ScenarioID;
+                m_StepID = p_StepID;
+                m_WaveCurrent = 0;
+                m_WaveMax = 0;
+                m_TimerDuration = 0;
+                m_CriteriaCount = 0;
+                m_ScenarioComplete = false;
+
+                m_CriteriaProgress.clear();
+            }
+
+            ScenarioData()
+            {
+                m_ScenarioID = 0;
+                m_StepID = 0;
+                m_WaveCurrent = 0;
+                m_WaveMax = 0;
+                m_TimerDuration = 0;
+                m_CriteriaCount = 0;
+                m_ScenarioComplete = false;
+
+                m_CriteriaProgress.clear();
+            }
+
+            void AddCriteriaProgress(CriteriaProgressData p_Data)
+            {
+                m_CriteriaProgress.push_back(p_Data);
+            }
+
+            uint32 m_ScenarioID;
+            uint32 m_StepID;
+            uint32 m_WaveCurrent;
+            uint32 m_WaveMax;
+            uint32 m_TimerDuration;
+            uint32 m_CriteriaCount;
+            bool m_ScenarioComplete;
+
+            std::vector<CriteriaProgressData> m_CriteriaProgress;
+        };
+
+        void ScheduleBeginningTimeUpdate(uint32 p_Diff);
+        void SendScenarioState(ScenarioData p_Data, Player* p_Player = nullptr);
+        void SendScenarioProgressUpdate(CriteriaProgressData p_Data, Player* p_Player = nullptr);
+
+        uint32 m_ScenarioID;
+        uint8  m_ScenarioStep;
+        uint32 m_BeginningTime;
+        uint64 m_InstanceGuid;
+
         void UpdatePhasing();
 
     protected:
-        void SetBossNumber(uint32 number) { bosses.resize(number); }
+        void SetBossNumber(uint32 number);
         void LoadDoorData(DoorData const* data);
         void LoadMinionData(MinionData const* data);
+        void LoadScenariosInfos(BossScenarios const* scenarios, uint32 scenarioID);
 
         void AddDoor(GameObject* door, bool add);
         void AddMinion(Creature* minion, bool add);
@@ -262,8 +381,106 @@ class InstanceScript : public ZoneScript
         std::string GetBossSaveData();
     private:
         std::vector<BossInfo> bosses;
+        std::vector<BossScenarios> bossesScenarios;
         DoorInfoMap doors;
         MinionInfoMap minions;
+        uint32 m_EncounterTime;
         uint32 completedEncounters; // completed encounter mask, bit indexes are DungeonEncounter.dbc boss numbers, used for packets
 };
+
+enum ScenarioSteps
+{
+    STEP_1      = 0,
+    STEP_2      = 1,
+    STEP_3      = 2,
+    STEP_4      = 3,
+    STEP_5      = 4,
+    STEP_6      = 5,
+    STEP_7      = 6,
+    STEP_8      = 7,
+    STEP_9      = 8,
+    STEP_10     = 9,
+    STEP_11     = 10,
+    STEP_12     = 11,
+    STEP_13     = 12,
+    STEP_14     = 13,
+    STEP_15     = 14,
+};
+
+struct ScenarioStepCriteria
+{
+    public:
+
+        ScenarioStepCriteria() {}
+
+        ScenarioStepCriteria(uint32 criteriaId, uint32 totalCount) : 
+            CriteriaId(criteriaId), CurrentCount(0), TotalCount(totalCount) {}
+
+        bool IsCompleted() const { return CurrentCount >= TotalCount; }
+
+        uint32 CriteriaId;
+        uint32 CurrentCount;
+        uint32 TotalCount;
+};
+
+typedef std::map<uint32 /*CriteriaId*/, ScenarioStepCriteria> ScenarioCriteriaMap;
+
+struct ScenarioStep
+{
+    public:
+
+        bool AddCriteria(uint32 criteriaId, uint32 totalCount);
+
+        bool UpdateCriteria(uint32 criteriaId, uint32 count = 1);
+
+        uint32 GetCriteriaCount(uint32 criteriaId);
+
+        bool IsCompleted() const;
+
+    private:
+
+        uint32 m_Step;
+        ScenarioCriteriaMap m_Criterias;
+};
+
+typedef std::map<uint32 /*step*/, ScenarioStep> ScenarioStepMap;
+
+class ScenarioController
+{
+    public:
+
+        explicit ScenarioController(Map* map, uint32 scenarioId, uint32 maxStep);
+
+        ScenarioStep& GetStep(uint32 step);
+
+        void UpdateCurrentStepCriteria(uint32 criteriaId, uint32 count = 1);
+        uint32 GetCurrentStepCriteriaCount(uint32 criteriaId);
+
+        void SetCurrentStep(uint32 step) { m_CurrentStep = step; }
+        uint32 GetCurrentStep() const { return m_CurrentStep; }
+        bool IsCurrentStep(uint32 step) const { return m_CurrentStep == step; }
+
+        uint32 GetScenarioId() const { return m_ScenarioId; }
+        uint32 GetMaxStep() const { return m_MaxStep; }
+
+        bool IsCompleted();
+
+        void SendScenarioProgressToAll(uint32 criteriaId);
+        void SendScenarioProgressToAll(uint32 criteriaId, uint32 count);
+        void SendScenarioState(Player* player);
+        void SendScenarioStateToAll();
+        void SendScenarioPOI(uint32 criteriaTreeId, Player* player);
+        void SendScenarioPOI(std::list<uint32>& criteriaTrees, Player* player);
+
+    private:
+
+        Map* m_Map;
+
+        uint32 m_ScenarioId;
+
+        uint32 m_CurrentStep;
+        uint32 m_MaxStep;
+        ScenarioStepMap m_Steps; 
+};
+
 #endif

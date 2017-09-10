@@ -26,6 +26,18 @@
 #include "Log.h"
 #include "LFGMgr.h"
 
+InstanceScript::InstanceScript(Map* map)
+{
+    instance = map;
+    completedEncounters = 0;
+
+    m_InstanceGuid = MAKE_NEW_GUID(map->GetId(), 0, HighGuid::HIGHGUID_INSTANCE_SAVE);
+    m_BeginningTime = 0;
+    m_ScenarioID = 0;
+    m_ScenarioStep = 0;
+    m_EncounterTime = 0;
+}
+
 void InstanceScript::SaveToDB()
 {
     std::string data = GetSaveData();
@@ -207,6 +219,7 @@ bool InstanceScript::SetBossState(uint32 id, EncounterState state)
     if (id < bosses.size())
     {
         BossInfo* bossInfo = &bosses[id];
+        BossScenarios* bossScenario = &bossesScenarios[id];
         if (!bossInfo)
             return false;
 
@@ -222,10 +235,15 @@ bool InstanceScript::SetBossState(uint32 id, EncounterState state)
                 return false;
 
             if (state == DONE)
+            {
                 if (!bossInfo->minion.empty())
                     for (MinionSet::iterator i = bossInfo->minion.begin(); i != bossInfo->minion.end(); ++i)
                         if ((*i)->isWorldBoss() && (*i)->IsAlive())
                             return false;
+
+                SendScenarioProgressUpdate(CriteriaProgressData(bossScenario->m_ScenarioID, 1, m_InstanceGuid, time(NULL), m_BeginningTime, 0));
+                SendScenarioState(ScenarioData(m_ScenarioID, ++m_ScenarioStep));
+            }
 
             bossInfo->state = state;
             SaveToDB();
@@ -619,4 +637,593 @@ void InstanceScript::UpdatePhasing()
     for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
         if (Player* player = itr->getSource())
             player->GetPhaseMgr().NotifyConditionChanged(phaseUpdateData);
+}
+
+void InstanceScript::OnPlayerEnter(Player* p_Player)
+{
+    SendScenarioState(ScenarioData(m_ScenarioID, m_ScenarioStep), p_Player);
+}
+
+void InstanceScript::SetBossNumber(uint32 p_Number)
+{
+    bosses.resize(p_Number);
+    bossesScenarios.resize(p_Number);
+}
+
+void InstanceScript::LoadScenariosInfos(BossScenarios const* p_Scenarios, uint32 p_ScenarioID)
+{
+    while (p_Scenarios->m_ScenarioID)
+    {
+        if (p_Scenarios->m_BossID < bosses.size())
+            bossesScenarios[p_Scenarios->m_BossID] = BossScenarios(p_Scenarios->m_BossID, p_Scenarios->m_ScenarioID);
+
+        ++p_Scenarios;
+    }
+
+    m_ScenarioID = p_ScenarioID;
+}
+
+void InstanceScript::ScheduleBeginningTimeUpdate(uint32 p_Diff)
+{
+    m_BeginningTime += p_Diff;
+}
+
+void InstanceScript::SendScenarioState(ScenarioData p_Data, Player* p_Player /*= nullptr*/)
+{
+    WorldPacket data(Opcodes::SMSG_SCENARIO_STATE);
+
+    data << int32(0);
+    data << int32(p_Data.m_StepID);
+    data << int32(p_Data.m_ScenarioID);
+    data << int32(0);
+    data << int32(0);
+    data << int32(0);
+    data << int32(0);
+
+    data.WriteBit(false);
+    data.WriteBits(p_Data.m_CriteriaCount, 21);
+
+    ByteBuffer byteBuffer;
+
+    for (CriteriaProgressData progressData : p_Data.m_CriteriaProgress)
+    {
+        ObjectGuid guid = progressData.m_Guid;
+        ObjectGuid quantity = progressData.m_Quantity;
+
+        data.WriteBit(guid[2]);
+        data.WriteBits(progressData.m_Flags, 4);
+        data.WriteBit(guid[6]);
+        data.WriteBit(quantity[2]);
+        data.WriteBit(quantity[7]);
+        data.WriteBit(guid[1]);
+        data.WriteBit(quantity[3]);
+        data.WriteBit(quantity[5]);
+        data.WriteBit(guid[7]);
+        data.WriteBit(guid[3]);
+        data.WriteBit(guid[5]);
+        data.WriteBit(quantity[4]);
+        data.WriteBit(quantity[0]);
+        data.WriteBit(quantity[1]);
+        data.WriteBit(guid[4]);
+        data.WriteBit(quantity[6]);
+        data.WriteBit(guid[0]);
+
+        byteBuffer.WriteByteSeq(guid[6]);
+        byteBuffer.WriteByteSeq(quantity[3]);
+        byteBuffer.WriteByteSeq(guid[3]);
+        byteBuffer << uint32(0);
+        byteBuffer << uint32(0);
+        byteBuffer.WriteByteSeq(guid[0]);
+        byteBuffer.WriteByteSeq(quantity[7]);
+        byteBuffer.WriteByteSeq(guid[2]);
+        byteBuffer.WriteByteSeq(quantity[1]);
+        byteBuffer.WriteByteSeq(quantity[6]);
+        byteBuffer.WriteByteSeq(quantity[0]);
+        byteBuffer.WriteByteSeq(guid[1]);
+        byteBuffer.WriteByteSeq(quantity[2]);
+        byteBuffer.WriteByteSeq(guid[5]);
+        byteBuffer.WriteByteSeq(quantity[4]);
+        byteBuffer << uint32(0);
+        byteBuffer.WriteByteSeq(guid[4]);
+        byteBuffer.WriteByteSeq(quantity[5]);
+        byteBuffer.WriteByteSeq(guid[7]);
+    }
+
+    data.WriteBit(false);
+
+    if (byteBuffer.size())
+        data.append(byteBuffer);
+
+    if (p_Player == nullptr)
+        instance->SendToPlayers(&data);
+    else
+        p_Player->SendDirectMessage(&data);
+}
+
+void InstanceScript::SendScenarioProgressUpdate(CriteriaProgressData p_Data, Player* p_Player /*= nullptr*/)
+{
+    ObjectGuid guid = p_Data.m_Guid;
+    ObjectGuid quantity = p_Data.m_Quantity;
+    WorldPacket data(Opcodes::SMSG_SCENARIO_PROGRESS_UPDATE);
+
+    data.WriteBit(guid[7]);
+    data.WriteBit(guid[0]);
+    data.WriteBit(guid[4]);
+    data.WriteBits(p_Data.m_Flags, 4);
+    data.WriteBit(quantity[3]);
+    data.WriteBit(quantity[4]);
+    data.WriteBit(quantity[0]);
+    data.WriteBit(guid[6]);
+    data.WriteBit(quantity[2]);
+    data.WriteBit(guid[3]);
+    data.WriteBit(quantity[7]);
+    data.WriteBit(guid[5]);
+    data.WriteBit(quantity[6]);
+    data.WriteBit(quantity[5]);
+    data.WriteBit(quantity[1]);
+    data.WriteBit(guid[2]);
+    data.WriteBit(guid[1]);
+
+    data.WriteByteSeq(guid[5]);
+    data.WriteByteSeq(quantity[2]);
+    data.WriteByteSeq(quantity[6]);
+    data.WriteByteSeq(guid[4]);
+    data.WriteByteSeq(quantity[4]);
+    data.WriteByteSeq(guid[6]);
+    data.WriteByteSeq(quantity[3]);
+    data << uint32(secsToTimeBitFields(p_Data.m_Date));
+    data.WriteByteSeq(guid[7]);
+    data.WriteByteSeq(quantity[5]);
+    data.WriteByteSeq(quantity[7]);
+    data.WriteByteSeq(quantity[0]);
+    data.WriteByteSeq(guid[1]);
+    data.WriteByteSeq(quantity[1]);
+    data.WriteByteSeq(guid[2]);
+    data.WriteByteSeq(guid[3]);
+    data << int32(p_Data.m_TimeFromStart);
+    data << int32(p_Data.m_TimeFromCreate);
+    data << int32(p_Data.m_ID);
+    data.WriteByteSeq(guid[0]);
+
+    if (p_Player == nullptr)
+        instance->SendToPlayers(&data);
+    else
+        p_Player->SendDirectMessage(&data);
+}
+
+bool ScenarioStep::AddCriteria(uint32 criteriaId, uint32 totalCount)
+{
+    if (m_Criterias.find(criteriaId) != m_Criterias.end())
+        return false;
+
+    ScenarioStepCriteria& criteria = m_Criterias[criteriaId];
+    criteria.CriteriaId = criteriaId;
+    criteria.CurrentCount = 0;
+    criteria.TotalCount = totalCount;
+
+    return true;
+}
+
+bool ScenarioStep::UpdateCriteria(uint32 criteriaId, uint32 count)
+{
+    if (m_Criterias.find(criteriaId) == m_Criterias.end())
+        return false;
+
+    m_Criterias[criteriaId].CurrentCount += count;
+
+    return true;
+}
+
+uint32 ScenarioStep::GetCriteriaCount(uint32 criteriaId)
+{
+    if (m_Criterias.find(criteriaId) == m_Criterias.end())
+        return 0;
+
+    return m_Criterias[criteriaId].CurrentCount;
+}
+
+bool ScenarioStep::IsCompleted() const
+{
+    for (ScenarioCriteriaMap::const_iterator itr = m_Criterias.begin(); itr != m_Criterias.end(); ++itr)
+    {
+        if (!itr->second.IsCompleted())
+            return false;
+    }
+
+    return true;
+}
+
+ScenarioController::ScenarioController(Map* map, uint32 scenarioId, uint32 maxStep) :
+m_Map(map), m_ScenarioId(scenarioId), m_MaxStep(maxStep)
+{
+    
+    m_CurrentStep = STEP_1;
+}
+
+ScenarioStep& ScenarioController::GetStep(uint32 step)
+{
+    return m_Steps[step];
+}
+
+void ScenarioController::UpdateCurrentStepCriteria(uint32 criteriaId, uint32 count)
+{
+    if (m_Steps.find(m_CurrentStep) == m_Steps.end())
+        return;
+
+    ScenarioStep& step = m_Steps[m_CurrentStep];
+
+    if (!step.UpdateCriteria(criteriaId, count))
+        return;
+
+    SendScenarioProgressToAll(criteriaId);
+
+    if (step.IsCompleted())
+    {
+        if (m_CurrentStep < m_MaxStep)
+        {
+            m_CurrentStep++;
+
+            SendScenarioStateToAll();
+        }
+    }
+}
+
+uint32 ScenarioController::GetCurrentStepCriteriaCount(uint32 criteriaId)
+{
+    if (m_Steps.find(m_CurrentStep) == m_Steps.end())
+        return 0;
+
+    ScenarioStep& step = m_Steps[m_CurrentStep];
+
+    return step.GetCriteriaCount(criteriaId);
+}
+
+bool ScenarioController::IsCompleted()
+{
+    if (m_Steps.find(m_CurrentStep) == m_Steps.end())
+        return false;
+
+    return GetStep(m_CurrentStep).IsCompleted();
+}
+
+void ScenarioController::SendScenarioProgressToAll(uint32 criteriaId)
+{
+    ObjectGuid counter = GetCurrentStepCriteriaCount(criteriaId);
+
+    for (Map::PlayerList::const_iterator itr = m_Map->GetPlayers().begin(); itr != m_Map->GetPlayers().end(); ++itr)
+    {
+        Player* player = itr->getSource();
+        if (!player)
+            continue;
+
+        WorldPacket packet(SMSG_SCENARIO_PROGRESS_UPDATE);
+        
+        ObjectGuid playerGuid = player->GetGUID();
+
+        uint32 bits4 = 0;
+
+        uint32 uint32_1 = 0;
+        uint32 uint32_2 = 0;
+
+        packet.WriteBit(playerGuid[7]);
+        packet.WriteBit(playerGuid[0]);
+        packet.WriteBit(playerGuid[4]);
+        packet.WriteBits(bits4, 4);
+        packet.WriteBit(counter[3]);
+        packet.WriteBit(counter[4]);
+        packet.WriteBit(counter[0]);
+        packet.WriteBit(playerGuid[6]);
+        packet.WriteBit(counter[2]);
+        packet.WriteBit(playerGuid[3]);
+        packet.WriteBit(counter[7]);
+        packet.WriteBit(playerGuid[5]);
+        packet.WriteBit(counter[6]);
+        packet.WriteBit(counter[5]);
+        packet.WriteBit(counter[1]);
+        packet.WriteBit(playerGuid[2]);
+        packet.WriteBit(playerGuid[1]);
+
+        packet.WriteByteSeq(playerGuid[5]);
+        packet.WriteByteSeq(counter[2]);
+        packet.WriteByteSeq(counter[6]);
+        packet.WriteByteSeq(playerGuid[4]);
+        packet.WriteByteSeq(counter[4]);
+        packet.WriteByteSeq(playerGuid[6]);
+        packet.WriteByteSeq(counter[3]);
+        packet << getMSTime();
+        packet.WriteByteSeq(playerGuid[7]);
+        packet.WriteByteSeq(counter[5]);
+        packet.WriteByteSeq(counter[7]);
+        packet.WriteByteSeq(counter[0]);
+        packet.WriteByteSeq(playerGuid[1]);
+        packet.WriteByteSeq(counter[1]);
+        packet.WriteByteSeq(playerGuid[2]);
+        packet.WriteByteSeq(playerGuid[3]);
+
+        packet << uint32_1;
+        packet << uint32_2;
+        packet << criteriaId;
+
+        packet.WriteByteSeq(playerGuid[0]);
+
+        player->GetSession()->SendPacket(&packet);
+    }
+}
+
+void ScenarioController::SendScenarioProgressToAll(uint32 criteriaId, uint32 count)
+{
+    ObjectGuid counter = count;
+
+    for (Map::PlayerList::const_iterator itr = m_Map->GetPlayers().begin(); itr != m_Map->GetPlayers().end(); ++itr)
+    {
+        Player* player = itr->getSource();
+        if (!player)
+            continue;
+
+        WorldPacket packet(SMSG_SCENARIO_PROGRESS_UPDATE);
+        
+        ObjectGuid playerGuid = player->GetGUID();
+
+        uint32 bits4 = 0;
+
+        uint32 uint32_1 = 0;
+        uint32 uint32_2 = 0;
+
+        packet.WriteBit(playerGuid[7]);
+        packet.WriteBit(playerGuid[0]);
+        packet.WriteBit(playerGuid[4]);
+        packet.WriteBits(bits4, 4);
+        packet.WriteBit(counter[3]);
+        packet.WriteBit(counter[4]);
+        packet.WriteBit(counter[0]);
+        packet.WriteBit(playerGuid[6]);
+        packet.WriteBit(counter[2]);
+        packet.WriteBit(playerGuid[3]);
+        packet.WriteBit(counter[7]);
+        packet.WriteBit(playerGuid[5]);
+        packet.WriteBit(counter[6]);
+        packet.WriteBit(counter[5]);
+        packet.WriteBit(counter[1]);
+        packet.WriteBit(playerGuid[2]);
+        packet.WriteBit(playerGuid[1]);
+
+        packet.WriteByteSeq(playerGuid[5]);
+        packet.WriteByteSeq(counter[2]);
+        packet.WriteByteSeq(counter[6]);
+        packet.WriteByteSeq(playerGuid[4]);
+        packet.WriteByteSeq(counter[4]);
+        packet.WriteByteSeq(playerGuid[6]);
+        packet.WriteByteSeq(counter[3]);
+        packet << getMSTime();
+        packet.WriteByteSeq(playerGuid[7]);
+        packet.WriteByteSeq(counter[5]);
+        packet.WriteByteSeq(counter[7]);
+        packet.WriteByteSeq(counter[0]);
+        packet.WriteByteSeq(playerGuid[1]);
+        packet.WriteByteSeq(counter[1]);
+        packet.WriteByteSeq(playerGuid[2]);
+        packet.WriteByteSeq(playerGuid[3]);
+
+        packet << uint32_1;
+        packet << uint32_2;
+        packet << criteriaId;
+
+        packet.WriteByteSeq(playerGuid[0]);
+
+        player->GetSession()->SendPacket(&packet);
+    }
+}
+
+void ScenarioController::SendScenarioState(Player* player)
+{
+    WorldPacket packet(SMSG_SCENARIO_STATE);
+
+    uint32 uint32_1 = 0;
+    uint32 uint32_4 = 0;
+    uint32 uint32_5 = 0;
+    uint32 uint32_6 = 0;
+    uint32 uint32_7 = 0; // bonus step
+
+    bool bit1 = false;
+    bool bit2 = false;
+
+    uint32 bits19_1 = 0;
+
+    packet << uint32_1;
+    packet << GetCurrentStep(); 
+    packet << m_ScenarioId; 
+    packet << uint32_4;
+    packet << uint32_5;
+    packet << uint32_6;
+    packet << uint32_7; // bonus step
+
+    packet.WriteBit(bit1);
+
+    packet.WriteBits(bits19_1, 19);
+    
+    /*guid1[i][2] = packet.ReadBit();
+                bits18 = (int)packet.ReadBits(4);
+                guid1[i][6] = packet.ReadBit();
+                guid2[i][2] = packet.ReadBit();
+                guid2[i][7] = packet.ReadBit();
+                guid1[i][1] = packet.ReadBit();
+                guid2[i][3] = packet.ReadBit();
+                guid2[i][5] = packet.ReadBit();
+                guid1[i][7] = packet.ReadBit();
+                guid1[i][3] = packet.ReadBit();
+                guid1[i][5] = packet.ReadBit();
+                guid2[i][4] = packet.ReadBit();
+                guid2[i][0] = packet.ReadBit();
+                guid2[i][1] = packet.ReadBit();
+                guid1[i][4] = packet.ReadBit();
+                guid2[i][6] = packet.ReadBit();
+                guid1[i][0] = packet.ReadBit();*/
+
+    packet.WriteBit(bit2);
+
+    /* for (var i = 0; i < bits10; ++i)
+            {
+                packet.ReadXORByte(guid1[i], 6);
+                packet.ReadXORByte(guid2[i], 3);
+                packet.ReadXORByte(guid1[i], 3);
+                packet.ReadInt32("Int54");
+                packet.ReadInt32("Int60");
+                packet.ReadXORByte(guid1[i], 0);
+                packet.ReadXORByte(guid2[i], 7);
+                packet.ReadXORByte(guid1[i], 2);
+                packet.ReadXORByte(guid2[i], 1);
+                packet.ReadXORByte(guid2[i], 6);
+                packet.ReadXORByte(guid2[i], 0);
+                packet.ReadXORByte(guid1[i], 1);
+                packet.ReadXORByte(guid2[i], 2);
+                packet.ReadXORByte(guid1[i], 5);
+                packet.ReadXORByte(guid2[i], 4);
+                packet.ReadPackedTime("Time", i);
+                packet.ReadXORByte(guid1[i], 4);
+                packet.ReadXORByte(guid2[i], 5);
+                packet.ReadInt32("Int14");
+                packet.ReadXORByte(guid1[i], 7);
+                packet.WriteGuid("Guid1", guid1[i], i);
+                packet.WriteGuid("Guid2", guid2[i], i);
+            }*/
+    player->GetSession()->SendPacket(&packet);
+}
+
+void ScenarioController::SendScenarioStateToAll()
+{
+    WorldPacket packet(SMSG_SCENARIO_STATE);
+
+    uint32 uint32_1 = 0;
+    uint32 uint32_4 = 0;
+    uint32 uint32_5 = 0;
+    uint32 uint32_6 = 0;
+    uint32 uint32_7 = 0; // bonus step
+
+    bool bit1 = false;
+    bool bit2 = false;
+
+    uint32 bits19_1 = 0;
+
+    packet << uint32_1;
+    packet << GetCurrentStep(); 
+    packet << m_ScenarioId; 
+    packet << uint32_4;
+    packet << uint32_5;
+    packet << uint32_6;
+    packet << uint32_7; // bonus step
+
+    packet.WriteBit(bit1);
+
+    packet.WriteBits(bits19_1, 19);
+    
+    /*guid1[i][2] = packet.ReadBit();
+                bits18 = (int)packet.ReadBits(4);
+                guid1[i][6] = packet.ReadBit();
+                guid2[i][2] = packet.ReadBit();
+                guid2[i][7] = packet.ReadBit();
+                guid1[i][1] = packet.ReadBit();
+                guid2[i][3] = packet.ReadBit();
+                guid2[i][5] = packet.ReadBit();
+                guid1[i][7] = packet.ReadBit();
+                guid1[i][3] = packet.ReadBit();
+                guid1[i][5] = packet.ReadBit();
+                guid2[i][4] = packet.ReadBit();
+                guid2[i][0] = packet.ReadBit();
+                guid2[i][1] = packet.ReadBit();
+                guid1[i][4] = packet.ReadBit();
+                guid2[i][6] = packet.ReadBit();
+                guid1[i][0] = packet.ReadBit();*/
+
+    packet.WriteBit(bit2);
+
+    /* for (var i = 0; i < bits10; ++i)
+            {
+                packet.ReadXORByte(guid1[i], 6);
+                packet.ReadXORByte(guid2[i], 3);
+                packet.ReadXORByte(guid1[i], 3);
+                packet.ReadInt32("Int54");
+                packet.ReadInt32("Int60");
+                packet.ReadXORByte(guid1[i], 0);
+                packet.ReadXORByte(guid2[i], 7);
+                packet.ReadXORByte(guid1[i], 2);
+                packet.ReadXORByte(guid2[i], 1);
+                packet.ReadXORByte(guid2[i], 6);
+                packet.ReadXORByte(guid2[i], 0);
+                packet.ReadXORByte(guid1[i], 1);
+                packet.ReadXORByte(guid2[i], 2);
+                packet.ReadXORByte(guid1[i], 5);
+                packet.ReadXORByte(guid2[i], 4);
+                packet.ReadPackedTime("Time", i);
+                packet.ReadXORByte(guid1[i], 4);
+                packet.ReadXORByte(guid2[i], 5);
+                packet.ReadInt32("Int14");
+                packet.ReadXORByte(guid1[i], 7);
+                packet.WriteGuid("Guid1", guid1[i], i);
+                packet.WriteGuid("Guid2", guid2[i], i);
+            }*/
+
+    for (Map::PlayerList::const_iterator itr = m_Map->GetPlayers().begin(); itr != m_Map->GetPlayers().end(); ++itr)
+    {
+        itr->getSource()->GetSession()->SendPacket(&packet);
+    }
+}
+
+void ScenarioController::SendScenarioPOI(uint32 criteriaTreeId, Player* player)
+{
+
+}
+
+void ScenarioController::SendScenarioPOI(std::list<uint32>& criteriaTrees, Player* player)
+{
+    uint32 uint32_1 = 0;
+    uint32 uint32_2 = 0;
+    uint32 uint32_3 = 0;
+    uint32 uint32_4 = 0;
+    uint32 uint32_5 = 0;
+    int32 uint32_6 = -3803;
+    int32 uint32_7 = -4788;
+    uint32 uint32_8 = 0;
+    uint32 uint32_9 = 0;
+    uint32 uint32_10 = 0;
+    uint32 uint32_11 = 27242; // criteria tree id
+
+    /*packet.ReadInt32("BlobID", i, j);
+                    packet.ReadInt32("MapID", i, j);
+                    packet.ReadInt32("WorldMapAreaID", i, j);
+                    packet.ReadInt32("Floor", i, j);
+                    packet.ReadInt32("Priority", i, j);
+                    packet.ReadInt32("Flags", i, j);
+                    packet.ReadInt32("WorldEffectID", i, j);
+                    packet.ReadInt32("PlayerConditionID", i, j);*/
+
+    for (std::list<uint32>::const_iterator itr = criteriaTrees.begin(); itr != criteriaTrees.end(); ++itr)
+    {
+        if ((*itr) == 27243)
+        {
+            WorldPacket packet(SMSG_SCENARIO_POI);
+            
+            packet.WriteBits(1, 21); // ScenarioPOIDataCount
+
+            packet.WriteBits(1, 19); // ScenarioBlobDataCount
+
+            packet.WriteBits(1, 21); // ScenarioPOIPointDataCount
+
+            packet << uint32_1;
+            packet << uint32_2;
+            packet << uint32_3;
+            packet << uint32_4;
+            packet << uint32_5;
+
+            packet << uint32_6;
+            packet << uint32_7;
+
+            packet << uint32_8;
+            packet << uint32_9;
+            packet << uint32_10;
+
+            packet << uint32_11;
+
+            player->GetSession()->SendPacket(&packet);
+        }
+    }
 }

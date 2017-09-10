@@ -972,7 +972,7 @@ void WorldObject::GetZoneAndAreaId(uint32& zoneid, uint32& areaid) const
 InstanceScript* WorldObject::GetInstanceScript()
 {
     Map* map = GetMap();
-    return map->IsDungeon() ? ((InstanceMap*)map)->GetInstanceScript() : NULL;
+    return (map->IsDungeon() || map->IsScenario()) ? ((InstanceMap*)map)->GetInstanceScript() : NULL;
 }
 
 float WorldObject::GetGridActivationRange() const
@@ -1718,7 +1718,7 @@ void WorldObject::SetZoneScript()
 {
     if (Map* map = FindMap())
     {
-        if (map->IsDungeon())
+        if (map->IsDungeon() || map->IsScenario())
             m_zoneScript = (ZoneScript*)((InstanceMap*)map)->GetInstanceScript();
         else if (!map->IsBattlegroundOrArena())
         {
