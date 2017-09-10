@@ -1916,7 +1916,7 @@ bool AchievementMgr<T>::IsCompletedCriteria(AchievementCriteriaEntry const* achi
         case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_GUILD_CHALLENGE:
             return progress->counter >= achievementCriteria->guild_challenge_complete.count;
         case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_SCENARIO:
-            return progress->counter >= value.scenario_complete.count;
+            return progress->counter >= achievementCriteria->scenario_complete.count;//value.scenario_complete.count;
 
         // handle all statistic-only criteria here
         case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_BATTLEGROUND:
@@ -3208,7 +3208,7 @@ bool AchievementMgr<T>::RequirementsSatisfied(AchievementCriteriaEntry const *ac
                 return false;
             break;
         case ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_SCENARIO:
-            if (p_MiscValue1 != value.scenario_complete.scenarioType)
+            if (miscValue1 != achievementCriteria->scenario_complete.scenarioType)
                 return false;
             break;
         default:

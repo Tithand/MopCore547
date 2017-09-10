@@ -179,7 +179,7 @@ class InstanceScript : public ZoneScript
         virtual void BeforePlayerEnter(Player* /*player*/) {}
 
         //Called when a player successfully enters the instance.
-        virtual void OnPlayerEnter(Player* /*player*/) {}
+        virtual void OnPlayerEnter(Player* /*player*/);
 
         //Handle open / close objects
         //use HandleGameObject(0, boolen, GO); in OnObjectCreate in instance scripts

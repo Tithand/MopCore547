@@ -1087,7 +1087,7 @@ enum TrinityStrings
     LANG_COMMAND_NO_OUTDOOR_PVP_FORUND  = 5034,
     LANG_NPCINFO_MECHANIC_IMMUNE        = 5037,
     LANG_NPCINFO_UNIT_FIELD_FLAGS       = 5038,
-    LANG_SCENARIO                       = 5039,
+    // LANG_SCENARIO                       = 5039,
     // Room for more Trinity strings      5040-9999
 
     // Level requirement notifications
