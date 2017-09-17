@@ -19,7 +19,7 @@ SET @ENTRY := 62074;
 UPDATE `creature_template` SET `AIName`='SmartAI' WHERE `entry`=@ENTRY;
 DELETE FROM `smart_scripts` WHERE `source_type`=0 AND `entryorguid`=@ENTRY;
 INSERT INTO `smart_scripts` (`entryorguid`,`source_type`,`id`,`link`,`event_type`,`event_phase_mask`,`event_chance`,`event_flags`,`event_param1`,`event_param2`,`event_param3`,`event_param4`,`action_type`,`action_param1`,`action_param2`,`action_param3`,`action_param4`,`action_param5`,`action_param6`,`target_type`,`target_param1`,`target_param2`,`target_param3`,`target_x`,`target_y`,`target_z`,`target_o`,`comment`) VALUES
-(@ENTRY,0,0,0,0,0,100,0,5000,8000,12000,15000,11,124944,0,0,0,0,0,2,0,0,0,0,0,0,0,'Cast Sonic Boom');
+(@ENTRY,0,0,0,0,0,100,0,5000,8000,12000,15000,11,124944,0,0,0,0,0,2,0,0,0,0,0,0,0,'Cast Sonic Boom'),
 (@ENTRY,0,1,0,0,0,100,0,10000,10000,20000,20000,11,124949,0,0,0,0,0,2,0,0,0,0,0,0,0,'Cast Sonic Blast');
 
 -- Adjunct Kree'zot <Hand of Shek'zeer>
@@ -150,7 +150,7 @@ SET @ENTRY := 63729;
 UPDATE `creature_template` SET `AIName`='SmartAI' WHERE `entry`=@ENTRY;
 DELETE FROM `smart_scripts` WHERE `source_type`=0 AND `entryorguid`=@ENTRY;
 INSERT INTO `smart_scripts` (`entryorguid`,`source_type`,`id`,`link`,`event_type`,`event_phase_mask`,`event_chance`,`event_flags`,`event_param1`,`event_param2`,`event_param3`,`event_param4`,`action_type`,`action_param1`,`action_param2`,`action_param3`,`action_param4`,`action_param5`,`action_param6`,`target_type`,`target_param1`,`target_param2`,`target_param3`,`target_x`,`target_y`,`target_z`,`target_o`,`comment`) VALUES
-(@ENTRY,0,0,0,0,0,100,0,5000,8000,12000,15000,11,117913,0,0,0,0,0,1,0,0,0,0,0,0,0,'Cast Ground Stomp'),
+(@ENTRY,0,0,0,0,0,100,0,5000,8000,12000,15000,11,117913,0,0,0,0,0,1,0,0,0,0,0,0,0,'Cast Ground Stomp');
 
 -- Bonedust Moth
 SET @ENTRY := 63725;
@@ -736,7 +736,7 @@ DELETE FROM `smart_scripts` WHERE `source_type`=0 AND `entryorguid`=@ENTRY;
 INSERT INTO `smart_scripts` (`entryorguid`,`source_type`,`id`,`link`,`event_type`,`event_phase_mask`,`event_chance`,`event_flags`,`event_param1`,`event_param2`,`event_param3`,`event_param4`,`action_type`,`action_param1`,`action_param2`,`action_param3`,`action_param4`,`action_param5`,`action_param6`,`target_type`,`target_param1`,`target_param2`,`target_param3`,`target_x`,`target_y`,`target_z`,`target_o`,`comment`) VALUES
 (@ENTRY,0,0,0,0,0,100,0,0,0,3400,4700,11,79085,64,0,0,0,0,2,0,0,0,0,0,0,0,'Cast Lightning Bolt'),
 (@ENTRY,0,1,0,9,0,100,0,0,8,15000,25000,11,125062,0,0,0,0,0,2,0,0,0,0,0,0,0,'Cast Flame Shock on Close'),
-(@ENTRY,0,1,0,0,0,100,0,8000,8000,15000,15000,11,83004,0,0,0,0,0,4,0,0,0,0,0,0,0,'Cast Storm Cloud');
+(@ENTRY,0,2,0,0,0,100,0,8000,8000,15000,15000,11,83004,0,0,0,0,0,4,0,0,0,0,0,0,0,'Cast Storm Cloud');
 
 -- Muckscale Shaman
 SET @ENTRY := 64008;
@@ -1130,4 +1130,3 @@ DELETE FROM `smart_scripts` WHERE `source_type`=0 AND `entryorguid`=@ENTRY;
 INSERT INTO `smart_scripts` (`entryorguid`,`source_type`,`id`,`link`,`event_type`,`event_phase_mask`,`event_chance`,`event_flags`,`event_param1`,`event_param2`,`event_param3`,`event_param4`,`action_type`,`action_param1`,`action_param2`,`action_param3`,`action_param4`,`action_param5`,`action_param6`,`target_type`,`target_param1`,`target_param2`,`target_param3`,`target_x`,`target_y`,`target_z`,`target_o`,`comment`) VALUES
 (@ENTRY,0,0,0,0,0,100,0,0,0,3500,4100,11,79444,64,0,0,0,0,2,0,0,0,0,0,0,0,'Cast Impale'),
 (@ENTRY,0,1,0,9,0,100,0,0,8,15000,25000,11,120442,0,0,0,0,0,1,0,0,0,0,0,0,0,'Cast Bladestorm on Close');
-
