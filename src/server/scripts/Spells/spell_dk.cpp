@@ -727,7 +727,7 @@ class spell_dk_remorseless_winter : public SpellScriptLoader
         {
             PrepareSpellScript(spell_dk_remorseless_winter_SpellScript);
 
-            void HandleOnHit() override
+            void HandleOnHit()
             {
                 if (Player* _player = GetCaster()->ToPlayer())
                     if (Unit* target = GetHitUnit())
@@ -736,7 +736,7 @@ class spell_dk_remorseless_winter : public SpellScriptLoader
                                 _player->CastSpell(target, DK_SPELL_REMORSELESS_WINTER_STUN, true);
             }
 
-            void Register()
+            void Register() override
             {
                 OnHit += SpellHitFn(spell_dk_remorseless_winter_SpellScript::HandleOnHit);
             }
