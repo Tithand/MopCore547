@@ -116,865 +116,742 @@ enum GarajalGhostTalk
 };
 
 // 60143 - Gara'jal the Spiritbinder
-class boss_garajal : public CreatureScript
+struct boss_garajal : public BossAI
 {
-    public:
-        boss_garajal() : CreatureScript("boss_garajal") {}
+    boss_garajal(Creature* creature) : BossAI(creature, DATA_GARAJAL_EVENT)
+    {
+        pInstance = creature->GetInstanceScript();
+    }
 
-        struct boss_garajalAI : public BossAI
+    InstanceScript* pInstance;
+    uint64 voodooTargets[3];
+
+    void Reset()
+    {
+        _Reset();
+
+        if (pInstance->GetBossState(DATA_GARAJAL_EVENT) != DONE)
+            pInstance->SetBossState(DATA_GARAJAL_EVENT, NOT_STARTED);
+
+        pInstance->SendEncounterUnit(ENCOUNTER_FRAME_DISENGAGE, me);
+
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_VISUAL);
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_SHARE);
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_CLONE_VISUAL);
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_CROSSED_OVER);
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_LIFE_FRAGILE_THREAD);
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_SOUL_CUT_DAMAGE);
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_SOUL_CUT_SUICIDE);
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_BANISHMENT);
+
+        events.Reset();
+
+        me->AddAura(SPELL_STRONG_MOJO, me);
+        me->CastSpell(me, SPELL_TAP_THE_SPIRIT_WORLD, true);
+    }
+
+    void JustDied(Unit* attacker)
+    {
+        pInstance->SetBossState(DATA_GARAJAL_EVENT, DONE);
+        _JustDied();
+        me->CastSpell(me, SPELL_RELEASE_SPIRIT, false);
+
+        events.Reset();
+        pInstance->SetBossState(DATA_GARAJAL_EVENT, DONE);
+        pInstance->SaveToDB();
+
+        pInstance->SendEncounterUnit(ENCOUNTER_FRAME_DISENGAGE, me);
+
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_VISUAL);
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_SHARE);
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_CLONE_VISUAL);
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_CROSSED_OVER);
+        pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_LIFE_FRAGILE_THREAD);
+
+        if (Creature* lorewalkerCho = GetClosestCreatureWithEntry(me, NPC_LOREWALKER_CHO, 200.0f, true))
         {
-            boss_garajalAI(Creature* creature) : BossAI(creature, DATA_GARAJAL_EVENT)
+            if (lorewalkerCho->AI())
             {
-                pInstance = creature->GetInstanceScript();
-            }
-
-            InstanceScript* pInstance;
-            uint64 voodooTargets[3];
-
-            void Reset()
-            {
-                _Reset();
-
-                if (pInstance->GetBossState(DATA_GARAJAL_EVENT) != DONE)
-                    pInstance->SetBossState(DATA_GARAJAL_EVENT, NOT_STARTED);
-
-                pInstance->SendEncounterUnit(ENCOUNTER_FRAME_DISENGAGE, me);
-
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_VISUAL);
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_SHARE);
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_CLONE_VISUAL);
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_CROSSED_OVER);
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_LIFE_FRAGILE_THREAD);
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_SOUL_CUT_DAMAGE);
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_SOUL_CUT_SUICIDE);
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_BANISHMENT);
-
-                events.Reset();
-
-                me->AddAura(SPELL_STRONG_MOJO, me);
-                me->CastSpell(me, SPELL_TAP_THE_SPIRIT_WORLD, true);
-            }
-
-            void JustDied(Unit* attacker)
-            {
-                pInstance->SetBossState(DATA_GARAJAL_EVENT, DONE);
-                _JustDied();
-                me->CastSpell(me, SPELL_RELEASE_SPIRIT, false);
-
-                events.Reset();
-                pInstance->SetBossState(DATA_GARAJAL_EVENT, DONE);
-                pInstance->SaveToDB();
-
-                pInstance->SendEncounterUnit(ENCOUNTER_FRAME_DISENGAGE, me);
-
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_VISUAL);
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_SHARE);
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_CLONE_VISUAL);
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_CROSSED_OVER);
-                pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_LIFE_FRAGILE_THREAD);
-
-                if (Creature* lorewalkerCho = GetClosestCreatureWithEntry(me, NPC_LOREWALKER_CHO, 200.0f, true))
                 {
-                    if (lorewalkerCho->AI())
-                    {
-                        {
-                            lorewalkerCho->AI()->DoAction(ACTION_CONTINUE_ESCORT);
-                            lorewalkerCho->AI()->DoAction(ACTION_RUN);
-                        }
-                    }
+                    lorewalkerCho->AI()->DoAction(ACTION_CONTINUE_ESCORT);
+                    lorewalkerCho->AI()->DoAction(ACTION_RUN);
                 }
             }
-
-            void EnterCombat(Unit* attacker)
-            {
-                if (!pInstance->CheckRequiredBosses(DATA_GARAJAL_EVENT))
-                {
-                    EnterEvadeMode();
-                    return;
-                }
-
-                events.ScheduleEvent(EVENT_SECONDARY_ATTACK,        urand(5000, 10000));
-                events.ScheduleEvent(EVENT_SUMMON_TOTEM,            urand(27500, 32500));
-                events.ScheduleEvent(EVENT_SUMMON_SHADOWY_MINION,   urand(10000, 15000));
-                events.ScheduleEvent(EVENT_BANISHMENT,              90000);
-                events.ScheduleEvent(EVENT_VOODOO_DOLL,             2500);
-                events.ScheduleEvent(EVENT_FINAL_DESTINATION,       361000); // 6 min & 10s
-
-                pInstance->SetBossState(DATA_GARAJAL_EVENT, IN_PROGRESS);
-                pInstance->SendEncounterUnit(ENCOUNTER_FRAME_ENGAGE, me);
-                Talk(TALK_AGGRO);
-
-                me->RemoveAura(SPELL_STRONG_MOJO);
-                me->RemoveAura(SPELL_TAP_THE_SPIRIT_WORLD);
-
-                me->InterruptNonMeleeSpells(false);
-            }
-
-            void KilledUnit(Unit* who)
-            {
-                if (who->GetTypeId() == TYPEID_PLAYER)
-                    Talk(TALK_SLAY);
-            }
-
-            void JustSummoned(Creature* summon)
-            {
-                summons.Summon(summon);
-            }
-
-            void SummonedCreatureDespawn(Creature* summon)
-            {
-                summons.Despawn(summon);
-            }
-
-            void DamageTaken(Unit* attacker, uint32& damage)
-            {
-                if (!pInstance)
-                    return;
-
-                if (!me->HasAura(SPELL_FRENESIE))
-                {
-                    if (me->HealthBelowPctDamaged(20, damage))
-                    {
-                        events.CancelEvent(EVENT_SUMMON_TOTEM);
-                        me->CastSpell(me, SPELL_FRENESIE, true);
-                        me->MonsterTextEmote("Gara'jal casts |cffba2200|Hspell:117752|h[Frenzy]|h|r !", 0, true);
-                    }
-                }
-            }
-
-            void UpdateAI(const uint32 diff)
-            {
-                if (!UpdateVictim())
-                    return;
-
-                if (me->HasUnitState(UNIT_STATE_CASTING))
-                    return;
-
-                events.Update(diff);
-
-                while (uint32 eventId = events.ExecuteEvent())
-                {
-                    switch (eventId)
-                    {
-                        case EVENT_SECONDARY_ATTACK:
-                        {
-                            if (Unit* target = SelectTarget(SELECT_TARGET_TOPAGGRO))
-                            {
-                                uint32 spellId = RAND(SPELL_RIGHT_CROSS, SPELL_LEFT_HOOK, SPELL_HAMMER_FIST, SPELL_SWEEPING_KICK);
-                                me->CastSpell(target, spellId, true);
-                            }
-                            events.ScheduleEvent(EVENT_SECONDARY_ATTACK, urand(5000, 10000));
-                            break;
-                        }
-                        case EVENT_SUMMON_TOTEM:
-                        {
-                            me->MonsterTextEmote("Gara'jal summons a Spirit Totem. Use it to Cross Over to the Spirit World !", 0, true);
-                            float x = 0.0f, y = 0.0f;
-                            GetRandPosFromCenterInDist(4277.08f, 1341.35f, frand(0.0f, 30.0f), x, y);
-                            me->SummonCreature(NPC_SPIRIT_TOTEM, x, y, 454.55f, 0.0f, TEMPSUMMON_CORPSE_DESPAWN);
-                            events.ScheduleEvent(EVENT_SUMMON_TOTEM,     urand(47500, 52500));
-                            break;
-                        }
-                        case EVENT_SUMMON_SHADOWY_MINION:
-                        {
-                            float x = 0.0f, y = 0.0f;
-                            GetRandPosFromCenterInDist(4277.08f, 1341.35f, frand(0.0f, 30.0f), x, y);
-                            me->SummonCreature(NPC_SHADOWY_MINION_REAL, x, y, 454.55f, 0.0f, TEMPSUMMON_CORPSE_DESPAWN);
-                            events.ScheduleEvent(EVENT_SUMMON_SHADOWY_MINION,     urand(10000, 15000));
-                            break;
-                        }
-                        case EVENT_VOODOO_DOLL:
-                        {
-                            pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_VISUAL);
-                            pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_SHARE);
-                            me->MonsterTextEmote("Gara'jal selects random players to become |cffba2200|Hspell:116000|h[Voodoo Dolls]|h|r !", 0, true);
-
-                            int32 mobCount = Is25ManRaid() ? 4 : 2;
-
-                            for (int32 i = 0; i < mobCount; ++i)
-                            {
-                                if (Unit* target = SelectTarget(i == 0 ? SELECT_TARGET_TOPAGGRO : SELECT_TARGET_RANDOM, 0, 0, true, -SPELL_VOODOO_DOLL_VISUAL))
-                                {
-                                    voodooTargets[i] = target->GetGUID();
-                                    me->MonsterTextEmote("You are a |cffba2200|Hspell:116000|h[Voodoo Doll]|h|r ! Damage you take is copied to the other Voodoo Dolls in your raid !", target->GetGUID(), true);
-                                    target->AddAura(SPELL_VOODOO_DOLL_VISUAL, target);
-                                }
-                            }
-
-                            if (Player* target = sObjectAccessor->GetPlayer(*me, voodooTargets[0]))
-                                me->CastSpell(target, SPELL_VOODOO_DOLL_SHARE, true);
-
-                            break;
-                        }
-                        case EVENT_BANISHMENT:
-                        {
-                            if (Unit* target = SelectTarget(SELECT_TARGET_TOPAGGRO))
-                            {
-                                me->AddAura(SPELL_BANISHMENT,       target);
-                                me->AddAura(SPELL_SOUL_CUT_SUICIDE, target);
-                                me->AddAura(SPELL_SOUL_CUT_DAMAGE,  target);
-
-                                Difficulty difficulty = me->GetMap()->GetDifficulty();
-                                uint64 viewerGuid = target->GetGUID();
-                                uint8  mobCount   = IsHeroic() ? 3 : 1;
-
-                                for (uint8 i = 0; i < mobCount; ++i)
-                                    if (Creature* soulCutter = me->SummonCreature(NPC_SOUL_CUTTER, target->GetPositionX() + 2.0f, target->GetPositionY() + 2.0f, target->GetPositionZ(), 0.0f, TEMPSUMMON_TIMED_DESPAWN, 30000, i == 0 ? viewerGuid: 0))
-                                    {
-                                        soulCutter->SetPhaseMask(2, true);
-                                        soulCutter->AI()->AttackStart(target);
-                                        soulCutter->SetInCombatWith(target);
-                                        soulCutter->getThreatManager().addThreat(target, 10000.0f);
-                                    }
-
-                                me->getThreatManager().resetAllAggro();
-                            }
-
-                            pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_VISUAL);
-                            pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_SHARE);
-
-                            events.ScheduleEvent(EVENT_VOODOO_DOLL, 5000);
-                            events.ScheduleEvent(EVENT_BANISHMENT, 90000);
-                            break;
-                        }
-                        case EVENT_FINAL_DESTINATION:
-                        {
-                            me->CastSpell(me, SPELL_FINAL_DESTINATION, false);
-                            Talk(TALK_FRENZY);
-                            break;
-                        }
-                        default:
-                            break;
-                    }
-                }
-
-                DoMeleeAttackIfReady();
-            }
-        };
-
-        CreatureAI* GetAI(Creature* creature) const
-        {
-            return new boss_garajalAI(creature);
         }
+    }
+
+    void EnterCombat(Unit* attacker)
+    {
+        if (!pInstance->CheckRequiredBosses(DATA_GARAJAL_EVENT))
+        {
+            EnterEvadeMode();
+            return;
+        }
+
+        events.ScheduleEvent(EVENT_SECONDARY_ATTACK, urand(5000, 10000));
+        events.ScheduleEvent(EVENT_SUMMON_TOTEM, urand(27500, 32500));
+        events.ScheduleEvent(EVENT_SUMMON_SHADOWY_MINION, urand(10000, 15000));
+        events.ScheduleEvent(EVENT_BANISHMENT, 90000);
+        events.ScheduleEvent(EVENT_VOODOO_DOLL, 2500);
+        events.ScheduleEvent(EVENT_FINAL_DESTINATION, 361000); // 6 min & 10s
+
+        pInstance->SetBossState(DATA_GARAJAL_EVENT, IN_PROGRESS);
+        pInstance->SendEncounterUnit(ENCOUNTER_FRAME_ENGAGE, me);
+        Talk(TALK_AGGRO);
+
+        me->RemoveAura(SPELL_STRONG_MOJO);
+        me->RemoveAura(SPELL_TAP_THE_SPIRIT_WORLD);
+
+        me->InterruptNonMeleeSpells(false);
+    }
+
+    void KilledUnit(Unit* who)
+    {
+        if (who->GetTypeId() == TYPEID_PLAYER)
+            Talk(TALK_SLAY);
+    }
+
+    void JustSummoned(Creature* summon)
+    {
+        summons.Summon(summon);
+    }
+
+    void SummonedCreatureDespawn(Creature* summon)
+    {
+        summons.Despawn(summon);
+    }
+
+    void DamageTaken(Unit* attacker, uint32& damage)
+    {
+        if (!pInstance)
+            return;
+
+        if (!me->HasAura(SPELL_FRENESIE))
+        {
+            if (me->HealthBelowPctDamaged(20, damage))
+            {
+                events.CancelEvent(EVENT_SUMMON_TOTEM);
+                me->CastSpell(me, SPELL_FRENESIE, true);
+                me->MonsterTextEmote("Gara'jal casts |cffba2200|Hspell:117752|h[Frenzy]|h|r !", 0, true);
+            }
+        }
+    }
+
+    void UpdateAI(const uint32 diff)
+    {
+        if (!UpdateVictim())
+            return;
+
+        if (me->HasUnitState(UNIT_STATE_CASTING))
+            return;
+
+        events.Update(diff);
+
+        while (uint32 eventId = events.ExecuteEvent())
+        {
+            switch (eventId)
+            {
+                case EVENT_SECONDARY_ATTACK:
+                {
+                    if (Unit* target = SelectTarget(SELECT_TARGET_TOPAGGRO))
+                    {
+                        uint32 spellId = RAND(SPELL_RIGHT_CROSS, SPELL_LEFT_HOOK, SPELL_HAMMER_FIST, SPELL_SWEEPING_KICK);
+                        me->CastSpell(target, spellId, true);
+                    }
+                    events.ScheduleEvent(EVENT_SECONDARY_ATTACK, urand(5000, 10000));
+                    break;
+                }
+                case EVENT_SUMMON_TOTEM:
+                {
+                    me->MonsterTextEmote("Gara'jal summons a Spirit Totem. Use it to Cross Over to the Spirit World !", 0, true);
+                    float x = 0.0f, y = 0.0f;
+                    GetRandPosFromCenterInDist(4277.08f, 1341.35f, frand(0.0f, 30.0f), x, y);
+                    me->SummonCreature(NPC_SPIRIT_TOTEM, x, y, 454.55f, 0.0f, TEMPSUMMON_CORPSE_DESPAWN);
+                    events.ScheduleEvent(EVENT_SUMMON_TOTEM, urand(47500, 52500));
+                    break;
+                }
+                case EVENT_SUMMON_SHADOWY_MINION:
+                {
+                    float x = 0.0f, y = 0.0f;
+                    GetRandPosFromCenterInDist(4277.08f, 1341.35f, frand(0.0f, 30.0f), x, y);
+                    me->SummonCreature(NPC_SHADOWY_MINION_REAL, x, y, 454.55f, 0.0f, TEMPSUMMON_CORPSE_DESPAWN);
+                    events.ScheduleEvent(EVENT_SUMMON_SHADOWY_MINION, urand(10000, 15000));
+                    break;
+                }
+                case EVENT_VOODOO_DOLL:
+                {
+                    pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_VISUAL);
+                    pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_SHARE);
+                    me->MonsterTextEmote("Gara'jal selects random players to become |cffba2200|Hspell:116000|h[Voodoo Dolls]|h|r !", 0, true);
+
+                    int32 mobCount = Is25ManRaid() ? 4 : 2;
+
+                    for (int32 i = 0; i < mobCount; ++i)
+                    {
+                        if (Unit* target = SelectTarget(i == 0 ? SELECT_TARGET_TOPAGGRO : SELECT_TARGET_RANDOM, 0, 0, true, -SPELL_VOODOO_DOLL_VISUAL))
+                        {
+                            voodooTargets[i] = target->GetGUID();
+                            me->MonsterTextEmote("You are a |cffba2200|Hspell:116000|h[Voodoo Doll]|h|r ! Damage you take is copied to the other Voodoo Dolls in your raid !", target->GetGUID(), true);
+                            target->AddAura(SPELL_VOODOO_DOLL_VISUAL, target);
+                        }
+                    }
+
+                    if (Player* target = sObjectAccessor->GetPlayer(*me, voodooTargets[0]))
+                        me->CastSpell(target, SPELL_VOODOO_DOLL_SHARE, true);
+
+                    break;
+                }
+                case EVENT_BANISHMENT:
+                {
+                    if (Unit* target = SelectTarget(SELECT_TARGET_TOPAGGRO))
+                    {
+                        me->AddAura(SPELL_BANISHMENT, target);
+                        me->AddAura(SPELL_SOUL_CUT_SUICIDE, target);
+                        me->AddAura(SPELL_SOUL_CUT_DAMAGE, target);
+
+                        Difficulty difficulty = me->GetMap()->GetDifficulty();
+                        uint64 viewerGuid = target->GetGUID();
+                        uint8  mobCount = IsHeroic() ? 3 : 1;
+
+                        for (uint8 i = 0; i < mobCount; ++i)
+                            if (Creature* soulCutter = me->SummonCreature(NPC_SOUL_CUTTER, target->GetPositionX() + 2.0f, target->GetPositionY() + 2.0f, target->GetPositionZ(), 0.0f, TEMPSUMMON_TIMED_DESPAWN, 30000, i == 0 ? viewerGuid : 0))
+                            {
+                                soulCutter->SetPhaseMask(2, true);
+                                soulCutter->AI()->AttackStart(target);
+                                soulCutter->SetInCombatWith(target);
+                                soulCutter->getThreatManager().addThreat(target, 10000.0f);
+                            }
+
+                        me->getThreatManager().resetAllAggro();
+                    }
+
+                    pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_VISUAL);
+                    pInstance->DoRemoveAurasDueToSpellOnPlayers(SPELL_VOODOO_DOLL_SHARE);
+
+                    events.ScheduleEvent(EVENT_VOODOO_DOLL, 5000);
+                    events.ScheduleEvent(EVENT_BANISHMENT, 90000);
+                    break;
+                }
+                case EVENT_FINAL_DESTINATION:
+                {
+                    me->CastSpell(me, SPELL_FINAL_DESTINATION, false);
+                    Talk(TALK_FRENZY);
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+
+        DoMeleeAttackIfReady();
+    }
 };
 
 // 61140 - Gara'jal the Spiritbinder
-class mob_garajal_ghost : public CreatureScript
+struct mob_garajal_ghost : public ScriptedAI
 {
-    public:
-        mob_garajal_ghost() : CreatureScript("mob_garajal_ghost") {}
+    mob_garajal_ghost(Creature* creature) : ScriptedAI(creature)
+    {
+        pInstance = creature->GetInstanceScript();
+    }
 
-        struct mob_garajal_ghostAI : public ScriptedAI
+    EventMap events;
+    InstanceScript* pInstance;
+    float ghostScale;
+
+    void Reset() override
+    {
+        me->SetReactState(REACT_PASSIVE);
+        me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+        me->AddAura(SPELL_GHOST_VISUAL, me);
+        me->AddAura(SPELL_STRONG_MOJO, me);
+        me->AddAura(SPELL_SPIRIT_HOVER, me);
+        ghostScale = me->GetFloatValue(OBJECT_FIELD_SCALE_X);
+        me->SetObjectScale(ghostScale / 10.0f);
+
+        events.ScheduleEvent(EVENT_GROWTH, 200);
+        events.ScheduleEvent(EVENT_TALK_DEATH, 4000);
+        events.ScheduleEvent(EVENT_SUMMON_PORTAL, 8000);
+        events.ScheduleEvent(EVENT_DISAPPEAR, 13000);
+    }
+
+    void JustSummoned(Creature* summon) override
+    {
+        if (summon->GetEntry() == NPC_SPIRITUAL_PORTAL)
         {
-            mob_garajal_ghostAI(Creature* creature) : ScriptedAI(creature)
-            {
-                pInstance = creature->GetInstanceScript();
-            }
-
-            EventMap events;
-            InstanceScript* pInstance;
-            float ghostScale;
-
-            void Reset()
-            {
-                me->SetReactState(REACT_PASSIVE);
-                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
-                me->AddAura(SPELL_GHOST_VISUAL, me);
-                me->AddAura(SPELL_STRONG_MOJO, me);
-                me->AddAura(SPELL_SPIRIT_HOVER, me);
-                ghostScale = me->GetFloatValue(OBJECT_FIELD_SCALE_X);
-                me->SetObjectScale(ghostScale / 10.0f);
-
-                events.ScheduleEvent(EVENT_GROWTH,          200);
-                events.ScheduleEvent(EVENT_TALK_DEATH,      4000);
-                events.ScheduleEvent(EVENT_SUMMON_PORTAL,   8000);
-                events.ScheduleEvent(EVENT_DISAPPEAR,       13000);
-            }
-
-            void JustSummoned(Creature* summon)
-            {
-                if (summon->GetEntry() == NPC_SPIRITUAL_PORTAL)
-                {
-                    summon->CastSpell(summon, SPELL_VISUAL_PORTAL, true);
-                    summon->SetReactState(REACT_PASSIVE);
-                    summon->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
-                }
-            }
-
-            void UpdateAI(const uint32 diff)
-            {
-                if (pInstance->GetBossState(DATA_GARAJAL_EVENT) != DONE)
-                    return;
-
-                events.Update(diff);
-
-                while (uint32 eventId = events.ExecuteEvent())
-                {
-                    switch (eventId)
-                    {
-                        case EVENT_GROWTH:
-                            if (me->GetFloatValue(OBJECT_FIELD_SCALE_X) < ghostScale)
-                            {
-                                me->SetObjectScale(me->GetFloatValue(OBJECT_FIELD_SCALE_X) + (ghostScale / 10.0f));
-                                events.ScheduleEvent(EVENT_GROWTH, 200);
-                            }
-                            break;
-                        case EVENT_TALK_DEATH:
-                            Talk(TALK_DEATH);
-                            break;
-                        case EVENT_SUMMON_PORTAL:
-                            me->CastSpell(me, SPELL_SPIRITUAL_PORTAL, true);
-                            break;
-                        case EVENT_DISAPPEAR:
-                            if (Creature* spiritualPortal = me->FindNearestCreature(NPC_SPIRITUAL_PORTAL, 50.0f))
-                                spiritualPortal->DespawnOrUnsummon(5000);
-                            me->DespawnOrUnsummon(500);
-                            break;
-                        default:
-                            break;
-                    }
-                }
-            }
-        };
-
-        CreatureAI* GetAI(Creature* creature) const
-        {
-            return new mob_garajal_ghostAI(creature);
+            summon->CastSpell(summon, SPELL_VISUAL_PORTAL, true);
+            summon->SetReactState(REACT_PASSIVE);
+            summon->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
         }
+    }
+
+    void UpdateAI(const uint32 diff) override
+    {
+        if (pInstance->GetBossState(DATA_GARAJAL_EVENT) != DONE)
+            return;
+
+        events.Update(diff);
+
+        while (uint32 eventId = events.ExecuteEvent())
+        {
+            switch (eventId)
+            {
+                case EVENT_GROWTH:
+                    if (me->GetFloatValue(OBJECT_FIELD_SCALE_X) < ghostScale)
+                    {
+                        me->SetObjectScale(me->GetFloatValue(OBJECT_FIELD_SCALE_X) + (ghostScale / 10.0f));
+                        events.ScheduleEvent(EVENT_GROWTH, 200);
+                    }
+                    break;
+                case EVENT_TALK_DEATH:
+                    Talk(TALK_DEATH);
+                    break;
+                case EVENT_SUMMON_PORTAL:
+                    me->CastSpell(me, SPELL_SPIRITUAL_PORTAL, true);
+                    break;
+                case EVENT_DISAPPEAR:
+                    if (Creature* spiritualPortal = me->FindNearestCreature(NPC_SPIRITUAL_PORTAL, 50.0f))
+                        spiritualPortal->DespawnOrUnsummon(5000);
+                    me->DespawnOrUnsummon(500);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
 };
 
 // 60240 - Spirit Totem
-class mob_spirit_totem : public CreatureScript
+struct mob_spirit_totem : public ScriptedAI
 {
-    public:
-        mob_spirit_totem() : CreatureScript("mob_spirit_totem") {}
+    mob_spirit_totem(Creature* creature) : ScriptedAI(creature)
+    {
+        pInstance = creature->GetInstanceScript();
+    }
 
-        struct mob_spirit_totemAI : public ScriptedAI
+    InstanceScript* pInstance;
+
+    void IsSummonedBy(Unit* summoner) override
+    {
+        me->AddAura(116827, me);
+        me->AddAura(SPELL_ROOT_FOR_EVER, me);
+        me->SetReactState(REACT_PASSIVE);
+    }
+
+    void JustDied(Unit* attacker) override
+    {
+        std::list<Player*> playerList;
+        GetPlayerListInGrid(playerList, me, 6.0f);
+
+        uint8 count = 0;
+        for (auto player : playerList)
         {
-            mob_spirit_totemAI(Creature* creature) : ScriptedAI(creature)
+            if (player->HasAura(SPELL_VOODOO_DOLL_VISUAL) || player->HasAura(SPELL_FRAIL_SOUL))
+                continue;
+
+            ++count;
+            if (count > 3)
+                break;
+
+            if (Creature* clone = player->SummonCreature(56405, player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), player->GetOrientation(), TEMPSUMMON_TIMED_DESPAWN, 30000))
             {
-                pInstance = creature->GetInstanceScript();
+                player->SetHealth(player->GetHealth() * 0.3);
+
+                player->CastSpell(player, SPELL_CLONE_VISUAL, true);
+
+                player->CastSpell(clone, SPELL_CLONE, true);
+                player->CastSpell(player, SPELL_LIFE_FRAGILE_THREAD, true);
+                player->CastSpell(player, SPELL_CROSSED_OVER, true);
+
+                if (player->GetRoleForGroup(player->GetSpecializationId(player->GetActiveSpec())) == ROLES_HEALER)
+                    player->AddAura(SPIRIT_INNERVATION_HEALER, player);
+                else
+                    player->AddAura(SPIRIT_INNERVATION_DPS, player);
             }
-
-            InstanceScript* pInstance;
-            
-            void IsSummonedBy(Unit* summoner)
-            {
-                me->AddAura(116827, me);
-                me->AddAura(SPELL_ROOT_FOR_EVER, me);
-                me->SetReactState(REACT_PASSIVE);
-            }
-
-            void JustDied(Unit* attacker)
-            {
-                std::list<Player*> playerList;
-                GetPlayerListInGrid(playerList, me, 6.0f);
-
-                uint8 count = 0;
-                for (auto player: playerList)
-                {
-                    if (player->HasAura(SPELL_VOODOO_DOLL_VISUAL) || player->HasAura(SPELL_FRAIL_SOUL))
-                        continue;
-
-                    ++count;
-                    if (count > 3)
-                        break;
-
-                    if (Creature* clone = player->SummonCreature(56405, player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), player->GetOrientation(),TEMPSUMMON_TIMED_DESPAWN,30000))
-                    {
-                        player->SetHealth(player->GetHealth() * 0.3);
-
-                        player->CastSpell(player, SPELL_CLONE_VISUAL, true);
-
-                        player->CastSpell(clone,  SPELL_CLONE, true);
-                        player->CastSpell(player, SPELL_LIFE_FRAGILE_THREAD, true);
-                        player->CastSpell(player, SPELL_CROSSED_OVER, true);
-
-                        if (player->GetRoleForGroup(player->GetSpecializationId(player->GetActiveSpec())) == ROLES_HEALER)
-                            player->AddAura(SPIRIT_INNERVATION_HEALER, player);
-                        else
-                            player->AddAura(SPIRIT_INNERVATION_DPS, player);
-                    }
-                }
-            }
-
-            void UpdateAI(const uint32 diff)
-            {
-                if (pInstance)
-                    if (pInstance->GetBossState(DATA_GARAJAL_EVENT) != IN_PROGRESS)
-                        me->DespawnOrUnsummon();
-            }
-        };
-
-        CreatureAI* GetAI(Creature* creature) const
-        {
-            return new mob_spirit_totemAI(creature);
         }
+    }
+
+    void UpdateAI(const uint32 diff) override
+    {
+        if (pInstance)
+            if (pInstance->GetBossState(DATA_GARAJAL_EVENT) != IN_PROGRESS)
+                me->DespawnOrUnsummon();
+    }
 };
 
 // 60240 - Clone player
-class mob_clone_player : public CreatureScript
+struct mob_clone_player : public ScriptedAI
 {
-    public:
-        mob_clone_player() : CreatureScript("mob_clone_player") {}
+    mob_clone_player(Creature* creature) : ScriptedAI(creature)
+    {
+    }
 
-        struct mob_clone_playerAI : public ScriptedAI
+    void IsSummonedBy(Unit* summoner) override
+    {
+        me->AddAura(SPELL_ANIM_VISUAL, me);
+        me->SetCanFly(true);
+        me->SetDisableGravity(true);
+        me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+        events.ScheduleEvent(EVENT_CHECK_PLAYER, 5000);
+        events.ScheduleEvent(EVENT_CLONE_TAKEOFF, 3000);
+    }
+
+    void UpdateAI(const uint32 diff) override
+    {
+        while (uint32 eventId = events.ExecuteEvent())
         {
-            mob_clone_playerAI(Creature* creature) : ScriptedAI(creature)
+            switch (eventId)
             {
+                // Spirit World
+                case EVENT_CHECK_PLAYER:
+                    if (me->ToTempSummon())
+                        if (Unit * Summoner = me->ToTempSummon()->GetSummoner())
+                            if (!Summoner->HasAura(SPELL_CROSSED_OVER))
+                                me->DespawnOrUnsummon();
+                    events.ScheduleEvent(EVENT_CHECK_PLAYER, 1000);
+                    break;
+                case EVENT_CLONE_TAKEOFF:
+                    me->GetMotionMaster()->MoveTakeoff(1, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ() + 9.0f);
+                    break;
             }
-            
-            void IsSummonedBy(Unit* summoner)
-            {
-               me->AddAura(SPELL_ANIM_VISUAL,me);
-               me->SetCanFly(true);
-               me->SetDisableGravity(true);
-               me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE|UNIT_FLAG_NOT_SELECTABLE);
-               events.ScheduleEvent(EVENT_CHECK_PLAYER, 5000);
-               events.ScheduleEvent(EVENT_CLONE_TAKEOFF, 3000);
-            }
-
-            void UpdateAI(const uint32 diff)
-            {
-                while (uint32 eventId = events.ExecuteEvent())
-                {
-                    switch (eventId)
-                    {
-                        // Spirit World
-                        case EVENT_CHECK_PLAYER:
-                            if (me->ToTempSummon())
-                                if (Unit * Summoner = me->ToTempSummon()->GetSummoner())
-                                    if (!Summoner->HasAura(SPELL_CROSSED_OVER))
-                                        me->DespawnOrUnsummon();
-                            events.ScheduleEvent(EVENT_CHECK_PLAYER, 1000);
-                            break;
-                        case EVENT_CLONE_TAKEOFF:
-                            me->GetMotionMaster()->MoveTakeoff(1, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ() + 9.0f);
-                            break;
-                    }
-                }
-            }
-        };
-
-        CreatureAI* GetAI(Creature* creature) const
-        {
-            return new mob_clone_playerAI(creature);
         }
+    }
 };
 
 // 60184 - Shadowy Minion
 // 60940 - Shadowy Minion
-class mob_shadowy_minion : public CreatureScript
+struct mob_shadowy_minion : public Scripted_NoMovementAI
 {
-    public:
-        mob_shadowy_minion() : CreatureScript("mob_shadowy_minion") {}
+    mob_shadowy_minion(Creature* creature) : Scripted_NoMovementAI(creature)
+    {
+        pInstance = creature->GetInstanceScript();
+    }
 
-        struct mob_shadowy_minionAI : public Scripted_NoMovementAI
+    InstanceScript* pInstance;
+
+    uint64 spiritGuid;
+    EventMap events;
+
+    void IsSummonedBy(Unit* summoner) override
+    {
+        events.Reset();
+        spiritGuid = 0;
+
+        me->setFaction(summoner->getFaction());
+        if (me->GetEntry() == NPC_SHADOWY_MINION_REAL)
         {
-            mob_shadowy_minionAI(Creature* creature) : Scripted_NoMovementAI(creature)
+            me->CastSpell(me, SPELL_CLONE_VISUAL, true);
+
+            if (Creature* spirit = me->SummonCreature(NPC_SHADOWY_MINION_SPIRIT, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), me->GetOrientation(), TEMPSUMMON_DEAD_DESPAWN))
             {
-                pInstance = creature->GetInstanceScript();
+                spiritGuid = spirit->GetGUID();
+                spirit->SetPhaseMask(2, true);
             }
 
-            InstanceScript* pInstance;
-
-            uint64 spiritGuid;
-            EventMap events;
-
-            void IsSummonedBy(Unit* summoner)
-            {
-                events.Reset();
-                spiritGuid = 0;
-
-                me->setFaction(summoner->getFaction());
-                if (me->GetEntry() == NPC_SHADOWY_MINION_REAL)
-                {
-                    me->CastSpell(me,SPELL_CLONE_VISUAL,true);
-
-                    if (Creature* spirit = me->SummonCreature(NPC_SHADOWY_MINION_SPIRIT, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), me->GetOrientation(), TEMPSUMMON_DEAD_DESPAWN))
-                    {
-                        spiritGuid = spirit->GetGUID();
-                        spirit->SetPhaseMask(2, true);
-                    }
-
-                    me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE|UNIT_FLAG_NOT_SELECTABLE);
-                    events.ScheduleEvent(EVENT_SPIRITUAL_GRASP, urand(2000, 5000));
-                }
-                else
-                    events.ScheduleEvent(EVENT_SHADOW_BOLT, urand(2000, 5000));
-
-                me->AddAura(SPELL_COSMETIC_SUMMON, me);
-
-                DoZoneInCombat();
-            }
-
-            void SummonedCreatureDespawn(Creature* summon)
-            {
-                if (summon->GetEntry() == NPC_SHADOWY_MINION_SPIRIT)
-                    me->DespawnOrUnsummon();
-            }
-
-            void JustDied(Unit* attacker)
-            {
-                if (me->GetEntry() == NPC_SHADOWY_MINION_SPIRIT)
-                    if (me->ToTempSummon())
-                        if (Unit* summoner = me->ToTempSummon()->GetSummoner())
-                            if (summoner->ToCreature())
-                                summoner->ToCreature()->DespawnOrUnsummon();
-            }
-
-            void UpdateAI(const uint32 diff)
-            {
-                if (pInstance)
-                    if (pInstance->GetBossState(DATA_GARAJAL_EVENT) != IN_PROGRESS)
-                        me->DespawnOrUnsummon();
-
-                events.Update(diff);
-
-                if (me->HasUnitState(UNIT_STATE_CASTING))
-                    return;
-
-                while (uint32 eventId = events.ExecuteEvent())
-                {
-                    switch (eventId)
-                    {
-                        // Spirit World
-                        case EVENT_SHADOW_BOLT:
-                        {
-                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true, SPELL_CROSSED_OVER))
-                                me->CastSpell(target, SPELL_SHADOW_BOLT, true);
-                            else if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true, SPELL_SOUL_CUT_SUICIDE))
-                                me->CastSpell(target, SPELL_SHADOW_BOLT, true);
-
-                            events.ScheduleEvent(EVENT_SHADOW_BOLT, urand(2000, 3000));
-                            break;
-                        }
-                        // Real World
-                        case EVENT_SPIRITUAL_GRASP:
-                        {
-                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true, -SPELL_SOUL_CUT_SUICIDE))
-                                me->CastSpell(target, SPELL_SPIRITUAL_GRASP, true);
-                            else if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true, -SPELL_CROSSED_OVER))
-                                me->CastSpell(target, SPELL_SPIRITUAL_GRASP, true);
-
-                            events.ScheduleEvent(EVENT_SPIRITUAL_GRASP, urand(5000, 8000));
-                            break;
-                        }
-                    }
-                }
-            }
-        };
-
-        CreatureAI* GetAI(Creature* creature) const
-        {
-            return new mob_shadowy_minionAI(creature);
+            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+            events.ScheduleEvent(EVENT_SPIRITUAL_GRASP, urand(2000, 5000));
         }
+        else
+            events.ScheduleEvent(EVENT_SHADOW_BOLT, urand(2000, 5000));
+
+        me->AddAura(SPELL_COSMETIC_SUMMON, me);
+
+        DoZoneInCombat();
+    }
+
+    void SummonedCreatureDespawn(Creature* summon) override
+    {
+        if (summon->GetEntry() == NPC_SHADOWY_MINION_SPIRIT)
+            me->DespawnOrUnsummon();
+    }
+
+    void JustDied(Unit* attacker) override
+    {
+        if (me->GetEntry() == NPC_SHADOWY_MINION_SPIRIT)
+            if (me->ToTempSummon())
+                if (Unit* summoner = me->ToTempSummon()->GetSummoner())
+                    if (summoner->ToCreature())
+                        summoner->ToCreature()->DespawnOrUnsummon();
+    }
+
+    void UpdateAI(const uint32 diff) override
+    {
+        if (pInstance)
+            if (pInstance->GetBossState(DATA_GARAJAL_EVENT) != IN_PROGRESS)
+                me->DespawnOrUnsummon();
+
+        events.Update(diff);
+
+        if (me->HasUnitState(UNIT_STATE_CASTING))
+            return;
+
+        while (uint32 eventId = events.ExecuteEvent())
+        {
+            switch (eventId)
+            {
+                // Spirit World
+                case EVENT_SHADOW_BOLT:
+                {
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true, SPELL_CROSSED_OVER))
+                        me->CastSpell(target, SPELL_SHADOW_BOLT, true);
+                    else if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true, SPELL_SOUL_CUT_SUICIDE))
+                        me->CastSpell(target, SPELL_SHADOW_BOLT, true);
+
+                    events.ScheduleEvent(EVENT_SHADOW_BOLT, urand(2000, 3000));
+                    break;
+                }
+                // Real World
+                case EVENT_SPIRITUAL_GRASP:
+                {
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true, -SPELL_SOUL_CUT_SUICIDE))
+                        me->CastSpell(target, SPELL_SPIRITUAL_GRASP, true);
+                    else if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100.0f, true, -SPELL_CROSSED_OVER))
+                        me->CastSpell(target, SPELL_SPIRITUAL_GRASP, true);
+
+                    events.ScheduleEvent(EVENT_SPIRITUAL_GRASP, urand(5000, 8000));
+                    break;
+                }
+            }
+        }
+    }
 };
 
 // 62003 - Severer of Souls
-class mob_soul_cutter : public CreatureScript
+struct mob_soul_cutter : public ScriptedAI
 {
-    public:
-        mob_soul_cutter() : CreatureScript("mob_soul_cutter") {}
+    mob_soul_cutter(Creature* creature) : ScriptedAI(creature)
+    {
+        pInstance = creature->GetInstanceScript();
+    }
 
-        struct mob_soul_cutterAI : public ScriptedAI
+    InstanceScript* pInstance;
+
+    void Reset() override
+    {
+        if (IsHeroic())
+            events.ScheduleEvent(EVENT_SOUL_EXPLOSION, 30000);
+    }
+
+    void JustDied(Unit* attacker) override
+    {
+        std::list<uint64> playerList;
+        me->GetMustBeVisibleForPlayersList(playerList);
+
+        for (auto guid : playerList)
         {
-            mob_soul_cutterAI(Creature* creature) : ScriptedAI(creature)
+            if (Player* player = ObjectAccessor::FindPlayer(guid))
             {
-                pInstance = creature->GetInstanceScript();
+                player->RemoveAurasDueToSpell(SPELL_BANISHMENT);
+                player->RemoveAurasDueToSpell(SPELL_SOUL_CUT_SUICIDE);
+                player->RemoveAurasDueToSpell(SPELL_SOUL_CUT_DAMAGE);
             }
-
-            InstanceScript* pInstance;
-
-            void Reset()
-            {
-                if (IsHeroic())
-                    events.ScheduleEvent(EVENT_SOUL_EXPLOSION, 30000);
-            }
-
-            void JustDied(Unit* attacker)
-            {
-                std::list<uint64> playerList;
-                me->GetMustBeVisibleForPlayersList(playerList);
-
-                for (auto guid: playerList)
-                {
-                    if (Player* player = ObjectAccessor::FindPlayer(guid))
-                    {
-                        player->RemoveAurasDueToSpell(SPELL_BANISHMENT);
-                        player->RemoveAurasDueToSpell(SPELL_SOUL_CUT_SUICIDE);
-                        player->RemoveAurasDueToSpell(SPELL_SOUL_CUT_DAMAGE);
-                    }
-                }
-            }
-
-            void UpdateAI(const uint32 diff)
-            {
-                if (pInstance)
-                    if (pInstance->GetBossState(DATA_GARAJAL_EVENT) != IN_PROGRESS)
-                        me->DespawnOrUnsummon();
-
-                events.Update(diff);
-
-                while (uint32 eventId = events.ExecuteEvent())
-                {
-                    switch(eventId)
-                    {
-                        case EVENT_SOUL_EXPLOSION:
-                        {
-                            std::list<Player*> playerList;
-                            GetPlayerListInGrid(playerList, me, 300.0f);
-                            bool hasCast = false;
-
-                            while (!hasCast)
-                            {
-                                if (playerList.empty())
-                                    break;
-
-                                for (auto player : playerList)
-                                {
-                                    if (urand(0, 1))
-                                    {
-                                        me->CastSpell(player, SPELL_SOUL_EXPLOSION, false);
-                                        hasCast = true;
-                                    }
-                                }
-                            }
-
-                            if (IsHeroic())
-                                events.ScheduleEvent(EVENT_SOUL_EXPLOSION, 30000);
-
-                            break;
-                        }
-                        default:
-                            break;
-                    }
-                }
-
-                DoMeleeAttackIfReady();
-            }
-        };
-
-        CreatureAI* GetAI(Creature* creature) const
-        {
-            return new mob_soul_cutterAI(creature);
         }
+    }
+
+    void UpdateAI(const uint32 diff) override
+    {
+        if (pInstance)
+            if (pInstance->GetBossState(DATA_GARAJAL_EVENT) != IN_PROGRESS)
+                me->DespawnOrUnsummon();
+
+        events.Update(diff);
+
+        while (uint32 eventId = events.ExecuteEvent())
+        {
+            switch (eventId)
+            {
+                case EVENT_SOUL_EXPLOSION:
+                {
+                    std::list<Player*> playerList;
+                    GetPlayerListInGrid(playerList, me, 300.0f);
+                    bool hasCast = false;
+
+                    while (!hasCast)
+                    {
+                        if (playerList.empty())
+                            break;
+
+                        for (auto player : playerList)
+                        {
+                            if (urand(0, 1))
+                            {
+                                me->CastSpell(player, SPELL_SOUL_EXPLOSION, false);
+                                hasCast = true;
+                            }
+                        }
+                    }
+
+                    if (IsHeroic())
+                        events.ScheduleEvent(EVENT_SOUL_EXPLOSION, 30000);
+
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+
+        DoMeleeAttackIfReady();
+    }
 };
 
 // 60512 - Spirit Totem
 // 60513 - Spirit Totem
-class mob_spirit_totem_intro : public CreatureScript
+struct mob_spirit_totem_intro : public ScriptedAI
 {
-    public:
-        mob_spirit_totem_intro() : CreatureScript("mob_spirit_totem_intro") {}
+    mob_spirit_totem_intro(Creature* creature) : ScriptedAI(creature)
+    {
+        pInstance = creature->GetInstanceScript();
+        creature->AddUnitMovementFlag(MOVEMENTFLAG_DISABLE_GRAVITY);
+    }
 
-        struct mob_spirit_totem_introAI : public ScriptedAI
-        {
-            mob_spirit_totem_introAI(Creature* creature) : ScriptedAI(creature)
-            {
-                pInstance = creature->GetInstanceScript();
-                creature->AddUnitMovementFlag(MOVEMENTFLAG_DISABLE_GRAVITY);
-            }
+    InstanceScript* pInstance;
 
-            InstanceScript* pInstance;
+    void Reset() override
+    {
+        if (me->GetEntry() == NPC_SPIRIT_TOTEM_SKULL_INTRO)
+            me->SetDisplayId(11686);
+    }
 
-            void Reset()
-            {
-                if (me->GetEntry() == NPC_SPIRIT_TOTEM_SKULL_INTRO)
-                    me->SetDisplayId(11686);
-            }
-
-            void UpdateAI(const uint32 diff)
-            {
-                if (Unit* skull = me->FindNearestCreature(NPC_SPIRIT_TOTEM_SKULL_INTRO, 15))
-                    if (!skull->HasAura(SPELL_CHANNEL_SPIRIT_TOTEM))
-                        me->CastSpell(skull, SPELL_CHANNEL_SPIRIT_TOTEM, true);
-            }
-        };
-
-        CreatureAI* GetAI(Creature* creature) const
-        {
-            return new mob_spirit_totem_introAI(creature);
-        }
+    void UpdateAI(const uint32 diff) override
+    {
+        if (Unit* skull = me->FindNearestCreature(NPC_SPIRIT_TOTEM_SKULL_INTRO, 15))
+            if (!skull->HasAura(SPELL_CHANNEL_SPIRIT_TOTEM))
+                me->CastSpell(skull, SPELL_CHANNEL_SPIRIT_TOTEM, true);
+    }
 };
 
 // Soul Back - 120715
-class spell_soul_back : public SpellScriptLoader
+class spell_soul_back : public SpellScript
 {
-    public:
-        spell_soul_back() : SpellScriptLoader("spell_soul_back") { }
+    PrepareSpellScript(spell_soul_back);
 
-        class spell_soul_back_SpellScript : public SpellScript
+    void HandleScript(SpellEffIndex /*effIndex*/)
+    {
+        if (Unit* target = GetHitUnit())
         {
-            PrepareSpellScript(spell_soul_back_SpellScript);
-
-            void HandleScript(SpellEffIndex /*effIndex*/)
-            {
-                if (Unit* target = GetHitUnit())
-                {
-                    // SPELL_LIFE_FRAGILE_THREAD removed by default effect
-                    target->RemoveAurasDueToSpell(SPELL_CLONE_VISUAL);
-                    target->RemoveAurasDueToSpell(SPELL_CROSSED_OVER);
-                    if (target->GetMap()->IsHeroic())
-                        target->AddAura(SPELL_FRAIL_SOUL, target);
-                    target->SetHealth(target->CountPctFromCurHealth(30));
-
-                    // Todo : Jump le joueur la ou etait son corps
-                }
-            }
-
-            void Register()
-            {
-                OnEffectHitTarget += SpellEffectFn(spell_soul_back_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_REMOVE_AURA);
-            }
-        };
-
-        SpellScript* GetSpellScript() const
-        {
-            return new spell_soul_back_SpellScript();
+            // SPELL_LIFE_FRAGILE_THREAD removed by default effect
+            target->RemoveAurasDueToSpell(SPELL_CLONE_VISUAL);
+            target->RemoveAurasDueToSpell(SPELL_CROSSED_OVER);
+            if (target->GetMap()->IsHeroic())
+                target->AddAura(SPELL_FRAIL_SOUL, target);
+            target->SetHealth(target->CountPctFromCurHealth(30));
         }
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_soul_back::HandleScript, EFFECT_0, SPELL_EFFECT_REMOVE_AURA);
+    }
 };
 
 // Final Destination - 118469
-class spell_final_destination : public SpellScriptLoader
+class spell_final_destination : public AuraScript
 {
-    public:
-        spell_final_destination() : SpellScriptLoader("spell_final_destination") { }
+    PrepareAuraScript(spell_final_destination);
 
-        class spell_final_destination_AuraScript : public AuraScript
+    void OnTick(constAuraEffectPtr aurEff)
+    {
+        if (Unit* Garajal = GetCaster())
         {
-            PrepareAuraScript(spell_final_destination_AuraScript);
-
-            void OnTick(constAuraEffectPtr aurEff)
+            if (InstanceScript* pInstance = Garajal->GetInstanceScript())
             {
-                if (Unit* Garajal = GetCaster())
-                {
-                    if (InstanceScript* pInstance = Garajal->GetInstanceScript())
-                    {
-                        Map::PlayerList const &PlayerList = pInstance->instance->GetPlayers();
+                Map::PlayerList const &PlayerList = pInstance->instance->GetPlayers();
 
-                        if (!PlayerList.isEmpty())
-                            for (Map::PlayerList::const_iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
-                                if (Player* player = i->getSource())
-                                    if (player->IsAlive())
-                                        Garajal->CastSpell(player, SPELL_INSTANTLY_DEATH, true);
-                    }
-                }
+                if (!PlayerList.isEmpty())
+                    for (Map::PlayerList::const_iterator i = PlayerList.begin(); i != PlayerList.end(); ++i)
+                        if (Player* player = i->getSource())
+                            if (player->IsAlive())
+                                Garajal->CastSpell(player, SPELL_INSTANTLY_DEATH, true);
             }
-
-            void Register()
-            {
-                OnEffectPeriodic += AuraEffectPeriodicFn(spell_final_destination_AuraScript::OnTick, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL);
-            }
-        };
-
-        AuraScript* GetAuraScript() const
-        {
-            return new spell_final_destination_AuraScript();
         }
+    }
+
+    void Register() override
+    {
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_final_destination::OnTick, EFFECT_0, SPELL_AURA_PERIODIC_TRIGGER_SPELL);
+    }
 };
 
 // Soul suicide - 116278
-class spell_soul_death : public SpellScriptLoader
+class spell_soul_death : public AuraScript
 {
-    public:
-        spell_soul_death() : SpellScriptLoader("spell_soul_death") { }
+    PrepareAuraScript(spell_soul_death);
 
-        class spell_soul_death_AuraScript : public AuraScript
-        {
-            PrepareAuraScript(spell_soul_death_AuraScript);
+    void OnRemove(constAuraEffectPtr aurEff, AuraEffectHandleModes /*mode*/)
+    {
+        Unit* caster = GetCaster();
+        if (caster && caster->IsAlive() && GetTargetApplication()->GetRemoveMode() == AURA_REMOVE_BY_EXPIRE)
+            caster->CastSpell(caster, 116325, true); // suicide
 
-            void OnRemove(constAuraEffectPtr aurEff, AuraEffectHandleModes /*mode*/)
-            {
-                Unit* caster = GetCaster();
-                if (caster && caster->IsAlive() && GetTargetApplication()->GetRemoveMode() == AURA_REMOVE_BY_EXPIRE)
-                    caster->CastSpell(caster,116325,true); // suicide
+    }
 
-            }
-
-            void Register()
-            {
-                AfterEffectRemove += AuraEffectRemoveFn(spell_soul_death_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
-            }
-        };
-
-        AuraScript* GetAuraScript() const
-        {
-            return new spell_soul_death_AuraScript();
-        }
+    void Register() override
+    {
+        AfterEffectRemove += AuraEffectRemoveFn(spell_soul_death::OnRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+    }
 };
 
 // Life fragile - 116227
-class spell_spirit_intervation : public SpellScriptLoader
+class spell_spirit_intervation : public AuraScript
 {
-    public:
-        spell_spirit_intervation() : SpellScriptLoader("spell_spirit_intervation") { }
+    PrepareAuraScript(spell_spirit_intervation);
 
-        class spell_spirit_intervation_AuraScript : public AuraScript
+    void OnProc(constAuraEffectPtr aurEff, ProcEventInfo& eventInfo)
+    {
+        PreventDefaultAction();
+
+        if (!GetCaster())
+            return;
+
+        Player* _player = GetCaster()->ToPlayer();
+        if (!_player)
+            return;
+
+        if (!eventInfo.GetHealInfo() || !eventInfo.GetHealInfo()->GetHeal())
+            return;
+
+        if (AuraPtr Intervation = _player->GetAura(_player->GetRoleForGroup(_player->GetSpecializationId(_player->GetActiveSpec())) == ROLES_HEALER ? SPIRIT_INNERVATION_HEALER : SPIRIT_INNERVATION_DPS))
         {
-            PrepareAuraScript(spell_spirit_intervation_AuraScript);
-
-            void OnProc(constAuraEffectPtr aurEff, ProcEventInfo& eventInfo)
+            uint32 gotHeal = eventInfo.GetHealInfo()->GetHeal();
+            int32 amount = ((gotHeal / _player->GetMaxHealth()) * 100) / 5; // every 5% healed by spells is 1% of intervation buff
+            if (Intervation->GetEffect(EFFECT_1)->GetAmount() < 25)
             {
-                PreventDefaultAction();
+                Intervation->GetEffect(EFFECT_0)->ChangeAmount(Intervation->GetEffect(EFFECT_0)->GetAmount() + (amount / 100.0f)*_player->GetMaxPower(POWER_MANA));
+                Intervation->GetEffect(EFFECT_1)->ChangeAmount(Intervation->GetEffect(EFFECT_1)->GetAmount() + amount);
 
-                if (!GetCaster())
-                    return;
-
-                Player* _player = GetCaster()->ToPlayer();
-                if (!_player)
-                    return;
-
-                if (!eventInfo.GetHealInfo() || !eventInfo.GetHealInfo()->GetHeal())
-                    return;
-
-                if (AuraPtr Intervation = _player->GetAura(_player->GetRoleForGroup(_player->GetSpecializationId(_player->GetActiveSpec())) == ROLES_HEALER ? SPIRIT_INNERVATION_HEALER : SPIRIT_INNERVATION_DPS))
+                if (Intervation->GetId() == SPIRIT_INNERVATION_DPS)
                 {
-                    uint32 gotHeal = eventInfo.GetHealInfo()->GetHeal();
-                    int32 amount = ((gotHeal / _player->GetMaxHealth()) * 100) / 5; // every 5% healed by spells is 1% of intervation buff
-                    if (Intervation->GetEffect(EFFECT_1)->GetAmount() < 25)
-                    {
-                        Intervation->GetEffect(EFFECT_0)->ChangeAmount(Intervation->GetEffect(EFFECT_0)->GetAmount()+(amount/100.0f)*_player->GetMaxPower(POWER_MANA));
-                        Intervation->GetEffect(EFFECT_1)->ChangeAmount(Intervation->GetEffect(EFFECT_1)->GetAmount()+amount);
-                    
-                        if (Intervation->GetId() == SPIRIT_INNERVATION_DPS)
-                        {
-                            Intervation->GetEffect(EFFECT_2)->ChangeAmount(Intervation->GetEffect(EFFECT_2)->GetAmount()+amount);
-                            Intervation->GetEffect(EFFECT_3)->ChangeAmount(Intervation->GetEffect(EFFECT_3)->GetAmount()+amount);
-                            Intervation->GetEffect(EFFECT_4)->ChangeAmount(Intervation->GetEffect(EFFECT_4)->GetAmount()+amount);
-                            Intervation->GetEffect(EFFECT_5)->ChangeAmount(Intervation->GetEffect(EFFECT_5)->GetAmount()+amount);
-                        }
-                    }
-
-                    if (_player->GetHealth() == _player->GetMaxHealth())
-                        if (!_player->HasAura(SPELL_SAVE_SOUL))
-                            _player->CastSpell(_player, SPELL_SAVE_SOUL, true);
+                    Intervation->GetEffect(EFFECT_2)->ChangeAmount(Intervation->GetEffect(EFFECT_2)->GetAmount() + amount);
+                    Intervation->GetEffect(EFFECT_3)->ChangeAmount(Intervation->GetEffect(EFFECT_3)->GetAmount() + amount);
+                    Intervation->GetEffect(EFFECT_4)->ChangeAmount(Intervation->GetEffect(EFFECT_4)->GetAmount() + amount);
+                    Intervation->GetEffect(EFFECT_5)->ChangeAmount(Intervation->GetEffect(EFFECT_5)->GetAmount() + amount);
                 }
             }
 
-            void Register()
-            {
-                OnEffectProc += AuraEffectProcFn(spell_spirit_intervation_AuraScript::OnProc, EFFECT_1, SPELL_AURA_PERIODIC_DUMMY);
-            }
-        };
-
-        AuraScript* GetAuraScript() const
-        {
-            return new spell_spirit_intervation_AuraScript();
+            if (_player->GetHealth() == _player->GetMaxHealth())
+                if (!_player->HasAura(SPELL_SAVE_SOUL))
+                    _player->CastSpell(_player, SPELL_SAVE_SOUL, true);
         }
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_spirit_intervation::OnProc, EFFECT_1, SPELL_AURA_PERIODIC_DUMMY);
+    }
 };
 
 void AddSC_boss_garajal()
 {
-    new boss_garajal();
-    new mob_garajal_ghost();
-    new mob_spirit_totem();
-    new mob_clone_player();
-    new mob_shadowy_minion();
-    new mob_soul_cutter();
-    new mob_spirit_totem_intro();
-    new spell_soul_back();
-    new spell_final_destination();
-    new spell_soul_death();
-    new spell_spirit_intervation();
+    RegisterCreatureAI(boss_garajal);
+    RegisterCreatureAI(mob_garajal_ghost);
+    RegisterCreatureAI(mob_spirit_totem);
+    RegisterCreatureAI(mob_clone_player);
+    RegisterCreatureAI(mob_shadowy_minion);
+    RegisterCreatureAI(mob_soul_cutter);
+    RegisterCreatureAI(mob_spirit_totem_intro);
+    RegisterSpellScript(spell_soul_back);
+    RegisterAuraScript(spell_final_destination);
+    RegisterAuraScript(spell_soul_death);
+    RegisterAuraScript(spell_spirit_intervation);
 }
